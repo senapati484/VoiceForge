@@ -1,187 +1,331 @@
-# VoiceForge Workspace
+# 🎙️ VoiceForge - AI Voice Agent Platform
 
-VoiceForge is an AI voice agent platform split into a Next.js frontend and an Express/TypeScript backend. It supports OTP and Google sign-in, agent management, knowledge ingestion, outbound calling, campaign workflows, credit tracking, Cloudflare R2 storage, Pinecone-backed retrieval, and Vapi call orchestration.
+<p align="center">
+  <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" />
+  <img src="https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=next.js&logoColor=white" />
+  <img src="https://img.shields.io/badge/Express.js-404D59?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white" />
+  <img src="https://img.shields.io/badge/Vapi-5D3FD3?style=for-the-badge" />
+</p>
 
-This root README is the entrypoint for the full workspace. Use it to understand the project layout, local setup, and where the deeper docs live.
+## 🌟 Overview
 
-## Workspace Overview
+VoiceForge is a complete AI Voice Agent platform that enables businesses to create intelligent voice assistants for both **inbound** (receiving calls) and **outbound** (making calls) scenarios. Built with modern tech stack including Next.js, Express, MongoDB, and Vapi.
 
-### Main Apps
+### Key Features
 
-- `voiceforge-web`: Next.js 16 frontend with App Router, NextAuth, Zustand, Axios, and shadcn/ui components.
-- `voiceforge-api`: Express 5 + TypeScript backend with MongoDB, Zod validation, Cloudflare R2 uploads, Pinecone retrieval, Vapi integrations, and a background worker.
-- `docs`: Supporting project docs and HTML exports.
+🤖 **AI Voice Agents** - Create custom AI agents with different personalities (marketing, support, sales, tech)
+📞 **Outbound Campaigns** - Upload CSV contacts and trigger AI-powered calling campaigns
+📲 **Inbound Calling** - Receive calls on your Vapi number with AI answering
+🌍 **International Calling** - Call any country's numbers globally
+🎙️ **Voice Selection** - Choose from multiple AI voices with previews
+📊 **Campaign Analytics** - Track call status, duration, transcripts
+🔧 **Custom Tools** - AI can execute functions (book appointments, send SMS, etc.)
+💳 **Credit System** - Built-in credit management for usage tracking
 
-### High-Level Architecture
+---
 
-- Frontend: `voiceforge-web` renders the landing page, login flow, dashboard, agents, calls, campaigns, billing, and knowledge screens.
-- Authentication: the frontend uses NextAuth for session handling and exchanges credentials or Google OAuth with backend auth endpoints.
-- Backend API: `voiceforge-api` exposes REST endpoints for auth, agents, voices, knowledge, credits, calls, campaigns, and health checks.
-- Data layer: MongoDB stores users, agents, calls, campaigns, credits, and knowledge document metadata.
-- Knowledge pipeline: uploaded files or scraped content are stored in Cloudflare R2, then processed by a worker and indexed into Pinecone for retrieval.
-- Voice operations: Vapi powers outbound calls and webhook-driven call updates.
+## 🏗️ Architecture
 
-## Repo Structure
-
-```text
-BinaryV2/
-├── docs/
-├── voiceforge-api/
-└── voiceforge-web/
+```
+┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐
+│   Frontend      │      │    Backend      │      │   External      │
+│   (Next.js)     │◄────►│   (Express)     │◄────►│   Services      │
+│                 │      │                 │      │                 │
+│ • Dashboard     │      │ • REST API      │      │ • Vapi.ai       │
+│ • Campaigns     │      │ • Webhooks      │      │ • MongoDB       │
+│ • Agents        │      │ • CSV Parser    │      │ • Cloudflare R2 │
+│ • Auth          │      │ • Credit System │      │ • Gemini AI     │
+└─────────────────┘      └─────────────────┘      └─────────────────┘
 ```
 
-- `docs/OAUTH_SETUP.md`: OAuth-specific setup notes.
-- `docs/VoiceAgentPlatform_Docs.html`: exported project documentation.
-- `docs/VoiceForge_Final_Playbook.html`: playbook-style reference doc.
-- `docs/VoiceForgev1.html`: additional exported product/project notes.
-- `voiceforge-api/src`: backend entrypoints, routes, middleware, services, validators, worker, and database code.
-- `voiceforge-api/POSTMAN_TESTING_GUIDE.md`: backend testing flow and endpoint walkthrough.
-- `voiceforge-web/app`: App Router pages including login, landing page, and dashboard sections.
-- `voiceforge-web/components`: reusable UI and dashboard components.
-- `voiceforge-web/lib`: API client, auth config, shared types, and utility helpers.
-- `voiceforge-web/store`: Zustand stores for client state.
+---
 
-## Local Setup
+## 📁 Project Structure
+
+```
+voiceforge/
+├── voiceforge-web/          # Frontend (Next.js 14)
+│   ├── app/                 # Next.js App Router
+│   │   ├── dashboard/       # Dashboard pages
+│   │   │   ├── agents/      # Agent management
+│   │   │   ├── campaigns/   # Campaign management
+│   │   │   └── settings/    # User settings
+│   │   ├── api/             # API routes
+│   │   └── layout.tsx       # Root layout
+│   ├── components/          # React components
+│   │   └── ui/              # shadcn/ui components
+│   ├── lib/                 # Utilities
+│   │   ├── api.ts           # API client
+│   │   └── types/           # TypeScript types
+│   └── store/               # Zustand state management
+│
+└── voiceforge-api/          # Backend (Express + TypeScript)
+    ├── src/
+    │   ├── routes/          # API routes
+    │   │   ├── vapi/        # Vapi webhook handlers
+    │   │   │   ├── webhook.ts    # Main webhook handler
+    │   │   │   └── tools.ts      # Tool definitions
+    │   │   ├── agents.ts    # Agent CRUD
+    │   │   ├── campaigns.ts # Campaign management
+    │   │   └── auth.ts      # Authentication
+    │   ├── services/        # Business logic
+    │   │   ├── campaign.service.ts   # CSV + Campaign logic
+    │   │   ├── vapi.service.ts       # Vapi integration
+    │   │   └── contextBuilder.service.ts  # AI context
+    │   ├── db/              # Database
+    │   │   ├── models/      # Mongoose models
+    │   │   └── mongoose.ts  # DB connection
+    │   ├── middleware/      # Express middleware
+    │   ├── validators/      # Input validation
+    │   └── index.ts         # Entry point
+    └── .env                 # Environment variables
+```
+
+---
+
+## 🚀 Quick Start
 
 ### Prerequisites
 
-- Node.js 20+ recommended
-- npm
-- MongoDB connection
-- Cloudflare R2 bucket and credentials
-- Pinecone index
-- Vapi account credentials
-- SMTP credentials for OTP email delivery
-- Google OAuth credentials if you want Google sign-in
+- Node.js 18+
+- MongoDB Atlas account (free)
+- Vapi account (free $10 credits)
+- Cloudflare R2 account (free tier)
+- Google Gemini API key (free)
 
-### 1. Install Dependencies
+### 1. Clone Repository
 
-Install each app separately:
+```bash
+git clone <repository-url>
+cd voiceforge
+```
+
+### 2. Setup Backend
 
 ```bash
 cd voiceforge-api
+cp .env.example .env
+# Edit .env with your credentials
 npm install
+npm run dev
 ```
+
+### 3. Setup Frontend
 
 ```bash
 cd voiceforge-web
 npm install
+npm run dev
 ```
 
-### 2. Configure Environment Files
+### 4. Configure Environment Variables
 
-Backend:
+**Backend `.env`:**
+```env
+PORT=4000
+NODE_ENV=development
+MONGODB_URI=mongodb+srv://...
+JWT_SECRET=your-super-secret-key
 
-- Copy values from `voiceforge-api/.env.example` into `voiceforge-api/.env`.
-- Do not commit real secrets from `voiceforge-api/.env`.
+# Vapi Credentials
+VAPI_API_KEY=your-vapi-server-key
+VAPI_WEBHOOK_SECRET=your-webhook-secret
 
-Frontend:
+# Ngrok (for local development)
+API_PUBLIC_URL=https://your-ngrok-url.ngrok-free.app
 
-- Create `voiceforge-web/.env.local` for local frontend configuration.
-- Do not commit real secrets from `voiceforge-web/.env.local`.
+# Gemini AI
+GEMINI_API_KEY=your-gemini-key
+GEMINI_MODEL=gemini-2.5-flash
 
-### 3. Start the Backend
+# Cloudflare R2
+R2_ACCOUNT_ID=...
+R2_ACCESS_KEY_ID=...
+R2_SECRET_ACCESS_KEY=...
+R2_BUCKET_NAME=...
+
+# Optional: Pinecone for RAG
+PINECONE_API_KEY=...
+PINECONE_INDEX=...
+```
+
+**Frontend `.env.local`:**
+```env
+NEXT_PUBLIC_API_URL=http://localhost:4000
+```
+
+---
+
+## 📚 Documentation
+
+### Quick Start
+- **[Complete Setup Guide](VOICEFORGE_COMPLETE_GUIDE.md)** ⭐ - Complete 0 to 100 guide for setting up everything
+- **[Vapi Dashboard Setup](docs/VAPI_DASHBOARD_SETUP.md)** - Configure Vapi webhooks for calling
+- **[Ngrok Setup](docs/NGROK_VAPI_SETUP.md)** - Local development tunneling setup
+
+### Project Docs
+- **[Frontend README](voiceforge-web/README.md)** - Next.js frontend documentation
+- **[Backend README](voiceforge-api/README.md)** - Express.js backend documentation
+- **[Troubleshooting](docs/VOICEFORGE_TROUBLESHOOTING.md)** - Common issues and fixes
+
+### Environment Templates
+- **[Backend .env.example](voiceforge-api/.env.example)** - Backend environment variables
+- **[Frontend .env.example](voiceforge-web/.env.example)** - Frontend environment variables
+
+---
+
+## 🎯 Core Workflows
+
+### Creating an AI Agent
+
+1. Go to Dashboard → Agents → New
+2. Select agent type (marketing/support/sales/tech)
+3. Configure:
+   - Name & Business Name
+   - Language & Tone
+   - Description & Call Objective
+   - Voice (with preview)
+4. Deploy - Creates Vapi assistant automatically
+
+### Running Outbound Campaign
+
+1. Create Campaign → Select Agent
+2. Upload CSV with contacts:
+   ```csv
+   name,phone,notes
+   John Doe,+15551234567,Interested in demo
+   ```
+3. Click "Start Campaign"
+4. AI calls each contact automatically
+5. Monitor progress in dashboard
+
+### Receiving Inbound Calls
+
+1. Buy phone number in Vapi dashboard
+2. Link to your agent
+3. Configure webhook URL
+4. Give number to customers
+5. AI answers when they call
+
+---
+
+## 🛠️ Tech Stack
+
+### Frontend
+- **Next.js 14** - React framework with App Router
+- **TypeScript** - Type safety
+- **Tailwind CSS** - Styling
+- **shadcn/ui** - UI components
+- **Zustand** - State management
+- **SWR** - Data fetching
+
+### Backend
+- **Express.js** - Web framework
+- **TypeScript** - Type safety
+- **MongoDB + Mongoose** - Database
+- **Vapi SDK** - Voice AI integration
+- **Gemini AI** - LLM for responses
+- **Cloudflare R2** - File storage
+- **Pinecone** - Vector database (optional)
+
+---
+
+## 🔐 Authentication
+
+- JWT-based authentication
+- Secure HTTP-only cookies
+- Protected API routes
+- Session management
+
+---
+
+## 💰 Pricing
+
+### Development (Free)
+- Vapi: $10 free credits
+- MongoDB: Free tier
+- Cloudflare R2: Free tier
+- Gemini: Free tier
+- Ngrok: Free tier
+
+### Production (Estimated)
+- Vapi number: $1-2/month
+- Calls: $0.05-0.15/minute
+- MongoDB: $5-10/month
+- Hosting: $5-20/month
+
+---
+
+## 🧪 Testing
 
 ```bash
+# Backend
 cd voiceforge-api
-npm run dev
-```
+npm run test
 
-Default backend URL: `http://localhost:4000`
-
-The API also starts a background worker that checks pending knowledge documents and ingests them into Pinecone.
-
-### 4. Start the Frontend
-
-```bash
+# Frontend
 cd voiceforge-web
-npm run dev
+npm run test
 ```
 
-Default frontend URL: `http://localhost:3000`
+---
 
-## Environment Summary
+## 📦 Deployment
 
-### Backend Environment
+### Backend (Railway/Render/AWS)
+```bash
+# Build
+npm run build
 
-The backend hard-fails on missing required variables. The source of truth is [`voiceforge-api/.env.example`](voiceforge-api/.env.example).
+# Start production
+npm start
+```
 
-Important backend variables include:
+### Frontend (Vercel/Netlify)
+```bash
+# Build
+npm run build
 
-- App: `PORT`, `NODE_ENV`, `FRONTEND_URL`, `API_PUBLIC_URL`
-- Database and auth: `MONGODB_URI`, `JWT_SECRET`
-- LLM and embeddings: `SMOLIFY_API_KEY`, `SMOLIFY_MODEL`, `GEMINI_API_KEY`
-- Storage: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`
-- Alternate storage key support: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_S3_API`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_ENDPOINT_URL`, `AWS_REGION`
-- Voice/call orchestration: `VAPI_API_KEY`, `VAPI_WEBHOOK_SECRET`
-- Retrieval: `PINECONE_API_KEY`, `PINECONE_INDEX`
-- Email OTP: `SMTP_USER`, `SMTP_PASS`
-- OAuth: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+# Deploy to Vercel
+vercel --prod
+```
 
-### Frontend Environment
+---
 
-The frontend code currently reads these variables:
+## 🤝 Contributing
 
-- `API_URL`: server-side API base URL used by NextAuth and dashboard data fetching
-- `NEXT_PUBLIC_API_URL`: browser-side API base URL used by the Axios client
-- `GOOGLE_CLIENT_ID`: Google provider client ID for NextAuth
-- `GOOGLE_CLIENT_SECRET`: Google provider client secret for NextAuth
-- Standard NextAuth deployment variables may also be needed depending on how you run it locally or in production
+1. Fork the repository
+2. Create feature branch (`git checkout -b feature/amazing`)
+3. Commit changes (`git commit -m 'Add feature'`)
+4. Push to branch (`git push origin feature/amazing`)
+5. Open Pull Request
 
-Recommended local defaults:
+---
 
-- `API_URL=http://localhost:4000`
-- `NEXT_PUBLIC_API_URL=http://localhost:4000/api`
+## 📝 License
 
-## Developer Commands
+MIT License - see LICENSE file
 
-### `voiceforge-api`
+---
 
-- `npm run dev`: run the backend with `ts-node-dev`
-- `npm run build`: compile TypeScript to `dist`
-- `npm start`: start the compiled backend from `dist/index.js`
+## 🙏 Acknowledgments
 
-### `voiceforge-web`
+- [Vapi](https://vapi.ai) - Voice AI platform
+- [Gemini](https://ai.google.dev) - Google's AI model
+- [shadcn/ui](https://ui.shadcn.com) - UI component library
+- [Next.js](https://nextjs.org) - React framework
 
-- `npm run dev`: start the Next.js dev server
-- `npm run build`: create a production build
-- `npm start`: run the production server
-- `npm run lint`: run ESLint
+---
 
-## Backend Surface Area
+## 📞 Support
 
-The backend currently exposes these main route groups:
+- Documentation: See `/docs` folder
+- Issues: Create GitHub issue
+- Email: support@voiceforge.ai
 
-- `/health`
-- `/api/auth`
-- `/api/agents`
-- `/api/calls`
-- `/api/knowledge`
-- `/api/credits`
-- `/api/voices`
-- `/api/campaigns`
+---
 
-Common flows already supported in the codebase:
-
-- Email OTP sign-in and Google sign-in
-- Agent creation and management
-- Knowledge upload and URL scraping
-- Background ingestion into Pinecone
-- Credits lookup and purchase flow
-- Outbound calling and call history
-- Campaign creation and execution
-
-## Useful Docs
-
-- [Backend Postman Testing Guide](voiceforge-api/POSTMAN_TESTING_GUIDE.md)
-- [OAuth Setup](docs/OAUTH_SETUP.md)
-- [Voice Agent Platform Docs](docs/VoiceAgentPlatform_Docs.html)
-- [VoiceForge Final Playbook](docs/VoiceForge_Final_Playbook.html)
-- [VoiceForge v1 Notes](docs/VoiceForgev1.html)
-
-## Notes
-
-- This project is documented here as a single workspace/codebase.
-- Git metadata currently exists at `voiceforge-web/.git`, while the workspace root itself is not initialized as a Git repo yet.
-- The root `.gitignore` becomes the active ignore policy once Git is initialized at the workspace root.
-- Existing subproject docs such as `voiceforge-web/README.md` remain in place for app-specific details.
+<p align="center">
+  <strong>Built with ❤️ for AI-powered voice communication</strong>
+</p>

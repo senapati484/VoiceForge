@@ -47,13 +47,21 @@ export async function createVapiAssistant(agent: IAgent): Promise<string> {
   const systemPrompt = buildSystemPrompt(agent, []);
   const requestBody = {
     name: agent.name,
+    // Primary voice provider with fallback
     voice: {
       provider: 'vapi',
-      voiceId: agent.voiceId
+      voiceId: agent.voiceId,
+      // Fallback to OpenAI voice if vapi voice fails
+      fallbackProvider: 'openai',
+      fallbackVoiceId: 'alloy' // OpenAI's default voice
     },
+    // Primary transcriber with fallback
     transcriber: {
       provider: 'vapi',
-      language: agent.language
+      language: agent.language,
+      // Fallback to Deepgram if vapi transcriber fails
+      fallbackProvider: 'deepgram',
+      fallbackModel: 'nova-2' // Deepgram's best model
     },
     model: {
       provider: 'custom-llm',
@@ -62,7 +70,8 @@ export async function createVapiAssistant(agent: IAgent): Promise<string> {
       systemPrompt: systemPrompt,
       temperature: 0.6
     },
-    serverUrl: `${config.apiPublicUrl}/api/calls/webhook`,
+    // Server URL for webhooks - uses the new /vapi/webhook endpoint
+    serverUrl: `${config.apiPublicUrl}/vapi/webhook`,
     firstMessage: getOpeningLine(agent),
     endCallPhrases: ['goodbye', 'bye', 'hang up', 'end call'],
     maxDurationSeconds: 600
@@ -84,10 +93,20 @@ export async function updateVapiAssistant(vapiId: string, updates: Partial<IAgen
 
   if (updates.name) body.name = updates.name;
   if (updates.voiceId) {
-    body.voice = { provider: 'vapi', voiceId: updates.voiceId };
+    body.voice = {
+      provider: 'vapi',
+      voiceId: updates.voiceId,
+      fallbackProvider: 'openai',
+      fallbackVoiceId: 'alloy'
+    };
   }
   if (updates.language) {
-    body.transcriber = { provider: 'vapi', language: updates.language };
+    body.transcriber = {
+      provider: 'vapi',
+      language: updates.language,
+      fallbackProvider: 'deepgram',
+      fallbackModel: 'nova-2'
+    };
   }
 
   await vapiRequest(`/assistant/${vapiId}`, {
@@ -113,17 +132,33 @@ export async function deleteVapiAssistant(vapiId: string): Promise<void> {
 export async function triggerOutboundCall(
   vapiAssistantId: string,
   toNumber: string,
-  metadata?: Record<string, string>
+  metadata?: Record<string, string>,
+  phoneNumberId?: string
 ): Promise<{ id: string }> {
+  const body: any = {
+    assistantId: vapiAssistantId,
+    customer: { number: toNumber },
+    assistantOverrides: metadata ? { metadata } : undefined
+  };
+
+  // Only add phoneNumberId if provided (for domestic calls with paid numbers)
+  // For international calls or free-tier numbers, omit this to use Vapi platform number
+  if (phoneNumberId) {
+    body.phoneNumberId = phoneNumberId;
+  }
+
+  console.log('[Vapi] Making outbound call:', {
+    to: toNumber,
+    assistantId: vapiAssistantId,
+    usingNumber: phoneNumberId || 'Vapi platform number (international mode)'
+  });
+
   const response = await vapiRequest('/call/phone', {
     method: 'POST',
-    body: JSON.stringify({
-      assistantId: vapiAssistantId,
-      customer: { number: toNumber },
-      assistantOverrides: metadata ? { metadata } : undefined
-    })
+    body: JSON.stringify(body)
   }) as { id: string };
 
+  console.log('[Vapi] Call initiated:', response.id);
   return response;
 }
 

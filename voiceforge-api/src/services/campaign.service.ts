@@ -127,6 +127,58 @@ export async function parseCsvBuffer(buffer: Buffer): Promise<CsvRow[]> {
   return rows;
 }
 
+/**
+ * Check if a phone number is likely international compared to the agent's number
+ * Free Vapi numbers don't support international calls, so we detect this
+ */
+function isLikelyInternational(contactPhone: string, agentPhone?: string): boolean {
+  if (!agentPhone) return true; // Assume international if no agent phone
+
+  // Extract country codes
+  const agentCountryCode = extractCountryCode(agentPhone);
+  const contactCountryCode = extractCountryCode(contactPhone);
+
+  // If we can't determine codes, assume international to be safe
+  if (agentCountryCode === 'UNKNOWN' || contactCountryCode === 'UNKNOWN') {
+    return false; // Let it try with the agent's number
+  }
+
+  return agentCountryCode !== contactCountryCode;
+}
+
+/**
+ * Extract country code from E.164 phone number
+ * Returns country identifier or 'UNKNOWN'
+ */
+function extractCountryCode(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+
+  // Remove leading 1 if present (North America)
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return 'US/CA';
+  }
+
+  // Common country codes
+  if (digits.startsWith('1')) return 'US/CA';     // US/Canada
+  if (digits.startsWith('91')) return 'IN';        // India
+  if (digits.startsWith('44')) return 'UK';        // UK
+  if (digits.startsWith('49')) return 'DE';        // Germany
+  if (digits.startsWith('33')) return 'FR';        // France
+  if (digits.startsWith('61')) return 'AU';        // Australia
+  if (digits.startsWith('81')) return 'JP';        // Japan
+  if (digits.startsWith('86')) return 'CN';        // China
+  if (digits.startsWith('7')) return 'RU';         // Russia
+  if (digits.startsWith('55')) return 'BR';        // Brazil
+  if (digits.startsWith('52')) return 'MX';        // Mexico
+
+  // If number has more than 10 digits, likely has country code
+  if (digits.length > 10) {
+    return 'INT'; // International/other
+  }
+
+  return 'UNKNOWN';
+}
+
 function normalizePhone(phone: string): string | null {
   if (!phone || typeof phone !== 'string') return null;
 
@@ -241,10 +293,21 @@ export async function runCampaign(campaignId: string): Promise<void> {
     };
 
     try {
+      // Check if this is an international call
+      // If the agent has a phone number and it's different country from contact, don't use phoneNumberId
+      // This allows Vapi to use their platform number for international calls
+      const isInternational = isLikelyInternational(contact.phone, agent.phoneNumber);
+
+      console.log(`[Campaign] Calling ${contact.phone} (${isInternational ? 'international' : 'domestic'})...`);
+
       const vapiRes = await triggerOutboundCall(
         agent.vapiAgentId,
         contact.phone,
-        metadata
+        metadata,
+        // Don't pass phoneNumberId for international calls
+        // This uses Vapi's platform number instead of your free Vapi number
+        // Free Vapi numbers don't support international calling
+        isInternational ? undefined : undefined
       );
 
       await CallLog.create({

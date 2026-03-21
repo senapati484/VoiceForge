@@ -19,6 +19,7 @@ import llmRoutes from './routes/llm';
 // Middleware
 import { errorHandler } from './middleware/errorHandler';
 import { webhookHandler } from './routes/calls/webhook';
+import { vapiWebhookHandler } from './routes/vapi/webhook';
 
 const app = express();
 
@@ -35,7 +36,10 @@ app.use(cors({
 app.use(morgan('dev'));
 
 // 4. RAW body parser for Vapi webhooks ONLY — MUST be before express.json()
+// Legacy webhook endpoint (backward compatibility)
 app.use('/api/calls/webhook', express.raw({ type: 'application/json' }), webhookHandler);
+// New Vapi webhook endpoint with full event support
+app.use('/vapi/webhook', express.json({ limit: '10mb' }), vapiWebhookHandler);
 
 // 5. JSON body parser
 app.use(express.json({ limit: '10mb' }));
@@ -52,6 +56,11 @@ app.use('/api/credits', creditRoutes);
 app.use('/api/voices', voiceRoutes);
 app.use('/api/campaigns', campaignRoutes);
 app.use('/api/llm', llmRoutes);
+
+// Vapi-specific routes
+import { getToolDefinitions, handleToolRequest } from './routes/vapi/tools';
+app.get('/vapi/tools', getToolDefinitions);
+app.post('/vapi/tools/:toolName', handleToolRequest);
 
 // 8. Health check
 app.get('/health', (_req, res) => {
