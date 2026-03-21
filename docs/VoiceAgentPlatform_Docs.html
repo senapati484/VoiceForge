@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>VoiceForge Platform — Technical Documentation v2</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap');
+:root {
+  --bg:#07070f; --bg2:#0d0d1a; --bg3:#12121f; --card:#0f0f1c;
+  --b:#1e1e35; --b2:#272742; --text:#eaeaf8; --muted:#6a6a9a; --dim:#333360;
+  --p:#7c6fff; --p2:#5a50e0; --pg:rgba(124,111,255,.1);
+  --g:#2dd4aa; --gb:rgba(45,212,170,.08);
+  --a:#ffb547; --ab:rgba(255,181,71,.08);
+  --r:#ff6b6b; --rb:rgba(255,107,107,.08);
+  --bl:#60a5fa; --blb:rgba(96,165,250,.08);
+  --or:#fb923c;
+  --mono:'JetBrains Mono',monospace;
+  --sans:'Outfit',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);line-height:1.72;font-size:15px;overflow-x:hidden}
+body::after{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.025'/%3E%3C/svg%3E");pointer-events:none;z-index:9999}
+.glow{position:fixed;border-radius:50%;filter:blur(140px);pointer-events:none;z-index:0}
+.g1{width:500px;height:500px;background:rgba(124,111,255,.06);top:-80px;right:-80px}
+.g2{width:400px;height:400px;background:rgba(45,212,170,.04);bottom:0;left:-60px}
+
+header{position:sticky;top:0;z-index:200;background:rgba(7,7,15,.88);backdrop-filter:blur(20px);border-bottom:1px solid var(--b);padding:0 32px}
+.hi{max-width:1400px;margin:0 auto;height:58px;display:flex;align-items:center;gap:16px}
+.logo{font-family:var(--sans);font-size:19px;font-weight:800;background:linear-gradient(135deg,var(--p),var(--g));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-.03em}
+.vtag{font-size:10px;font-family:var(--mono);background:#141428;border:1px solid #2a2a50;color:var(--muted);padding:2px 8px;border-radius:20px}
+.hsep{flex:1}
+.hpill{font-size:10px;font-family:var(--mono);font-weight:600;padding:3px 10px;border-radius:20px;border:1px solid;letter-spacing:.05em}
+.hp-e{color:var(--g);border-color:#0d3a2d;background:#041a14}
+.hp-f{color:var(--p);border-color:#2a2660;background:#0e0c2a}
+.hp-d{color:var(--bl);border-color:#1a2d4a;background:#05101e}
+
+.wrap{display:flex;max-width:1400px;margin:0 auto;position:relative;z-index:1}
+
+.sb{width:240px;flex-shrink:0;position:sticky;top:58px;height:calc(100vh - 58px);overflow-y:auto;padding:16px 0 40px;border-right:1px solid var(--b);scrollbar-width:thin;scrollbar-color:var(--b) transparent}
+.sb::-webkit-scrollbar{width:3px}
+.sb::-webkit-scrollbar-thumb{background:var(--b2);border-radius:2px}
+.sg{font-size:9px;font-family:var(--mono);font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);padding:12px 18px 4px}
+.sl{display:flex;align-items:center;gap:7px;padding:6px 18px;font-size:12.5px;color:var(--muted);text-decoration:none;transition:all .12s;border-left:2px solid transparent}
+.sl:hover{color:var(--text);background:rgba(255,255,255,.03);border-left-color:var(--b2)}
+.sl.on{color:var(--p);border-left-color:var(--p);background:var(--pg)}
+.sl .d{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.dp{background:var(--p)}.dg{background:var(--g)}.db{background:var(--bl)}.da{background:var(--a)}.dr{background:var(--r)}.dor{background:var(--or)}.dw{background:#888}
+
+.main{flex:1;padding:36px 52px 80px;min-width:0}
+
+h1{font-size:30px;font-weight:800;letter-spacing:-.03em;line-height:1.2;margin-bottom:8px}
+h1 em{font-style:normal;background:linear-gradient(90deg,var(--p),var(--g));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+h2{font-size:20px;font-weight:700;margin:44px 0 14px;padding-bottom:10px;border-bottom:1px solid var(--b);letter-spacing:-.02em}
+h3{font-size:14px;font-weight:700;margin:22px 0 8px;color:var(--g)}
+h4{font-size:13px;font-weight:600;margin:16px 0 6px;color:var(--a)}
+p{margin-bottom:12px;color:#c0c0da;font-size:14.5px}
+p strong{color:var(--text)}
+a{color:var(--p);text-decoration:none}
+hr{border:none;border-top:1px solid var(--b);margin:28px 0}
+code{font-family:var(--mono);font-size:11.5px;color:var(--g);background:#041a14;border:1px solid #0d3a2d;padding:1px 6px;border-radius:3px}
+
+.sh{display:flex;align-items:center;gap:12px;margin:44px 0 16px;padding-bottom:10px;border-bottom:1px solid var(--b)}
+.sh-n{font-size:10px;font-family:var(--mono);font-weight:600;color:var(--muted);background:var(--bg3);border:1px solid var(--b);padding:2px 8px;border-radius:3px}
+.sh-t{font-size:17px;font-weight:700;letter-spacing:-.02em}
+.sh-l{flex:1;height:1px;background:var(--b)}
+.sh-b{font-size:9px;font-family:var(--mono);font-weight:600;padding:3px 9px;border-radius:20px;letter-spacing:.06em;text-transform:uppercase;border:1px solid;white-space:nowrap}
+.sb-be{color:var(--g);border-color:#0d3a2d;background:#041a14}
+.sb-fe{color:var(--p);border-color:#2a2660;background:#0e0c2a}
+.sb-db{color:var(--bl);border-color:#1a2d4a;background:#05101e}
+.sb-rag{color:var(--r);border-color:#3a1414;background:#160505}
+.sb-or{color:var(--or);border-color:#3a2000;background:#160c00}
+.sb-wf{color:#d4b8ff;border-color:#3a3060;background:#12103a}
+
+.ib{border-radius:8px;padding:12px 16px;margin:10px 0;font-size:13px;display:flex;gap:10px;align-items:flex-start}
+.ib .ico{flex-shrink:0;font-size:14px;margin-top:1px}
+.ib p{margin:0;line-height:1.6;font-size:13px}
+.ib-g{background:var(--gb);border:1px solid #0d3a2d;color:#7ae0c0}
+.ib-a{background:var(--ab);border:1px solid #3a2800;color:#d4993c}
+.ib-r{background:var(--rb);border:1px solid #3a1414;color:#ff9090}
+.ib-b{background:var(--blb);border:1px solid #1a2d4a;color:#90c8ff}
+.ib-p{background:var(--pg);border:1px solid #2a2660;color:#a090ff}
+
+.hero{background:var(--bg2);border:1px solid var(--b2);border-radius:16px;padding:28px 32px;margin-bottom:36px;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(124,111,255,.05),transparent 60%);pointer-events:none}
+.hero-eyebrow{font-size:10px;font-family:var(--mono);color:var(--p);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:16px}
+.chip{font-size:10.5px;font-family:var(--mono);padding:3px 10px;border-radius:20px;border:1px solid}
+.c-p{color:var(--p);border-color:#2a2660;background:#0e0c2a}
+.c-g{color:var(--g);border-color:#0d3a2d;background:#041a14}
+.c-a{color:var(--a);border-color:#3a2800;background:#1a1200}
+.c-b{color:var(--bl);border-color:#1a2d4a;background:#05101e}
+.c-r{color:var(--r);border-color:#3a1414;background:#160505}
+.c-w{color:#9090c0;border-color:var(--b2);background:var(--bg3)}
+
+.arch-diagram{display:grid;grid-template-columns:1fr 1fr;gap:3px;background:var(--b);border-radius:12px;overflow:hidden;margin:16px 0 24px;border:1px solid var(--b2)}
+.arch-q{padding:20px 22px}
+.aq-fe{background:#0b0b1e}
+.aq-be{background:#040f0a}
+.aq-db{background:#050b14}
+.aq-wk{background:#0f0800}
+.aq-tag{font-size:9px;font-family:var(--mono);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+.t-fe{color:var(--p)}.t-be{color:var(--g)}.t-db{color:var(--bl)}.t-wk{color:var(--a)}
+.aq-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px}
+.aq-desc{font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:8px}
+.aq-pills{display:flex;flex-wrap:wrap;gap:4px}
+.ap{font-size:10px;font-family:var(--mono);padding:2px 7px;border-radius:3px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);color:#8080b0}
+
+.always-on{background:linear-gradient(135deg,#040f0a,#07070f);border:1px solid #0d3a2d;border-radius:12px;padding:20px 24px;margin:16px 0;display:flex;gap:16px;align-items:flex-start}
+.ao-icon{font-size:28px;flex-shrink:0;margin-top:2px}
+.ao-title{font-size:13px;font-weight:700;color:var(--g);margin-bottom:6px;font-family:var(--mono);letter-spacing:.04em}
+.ao-body{font-size:13px;color:#7090a0;line-height:1.7}
+.ao-body strong{color:var(--text)}
+
+.wf-chain{display:flex;flex-direction:column;gap:0;margin:16px 0}
+.wf-step{display:flex;gap:16px;align-items:flex-start;padding:14px 0}
+.wf-step:not(:last-child){border-bottom:1px solid var(--b)}
+.wf-num{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;font-family:var(--mono)}
+.wn-p{background:#1a1240;color:var(--p);border:1px solid #2a2260}
+.wn-g{background:#041a14;color:var(--g);border:1px solid #0d3a2d}
+.wn-a{background:#1a1200;color:var(--a);border:1px solid #3a2800}
+.wn-b{background:#05101e;color:var(--bl);border:1px solid #1a2d4a}
+.wf-title{font-size:13.5px;font-weight:700;color:var(--text);margin-bottom:3px}
+.wf-desc{font-size:12.5px;color:var(--muted);line-height:1.6}
+.wf-desc code{font-size:10.5px}
+
+.sub-steps{background:var(--bg3);border:1px solid var(--b);border-radius:8px;padding:12px 16px;margin:8px 0;font-family:var(--mono);font-size:11.5px;line-height:2;color:#8888b8}
+.sub-steps .hl{color:var(--g)}.sub-steps .dim{color:var(--dim)}.sub-steps .warn{color:var(--a)}
+
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}
+.cmp{border-radius:10px;padding:16px 18px}
+.cmp-old{background:#160505;border:1px solid #3a1414}
+.cmp-new{background:#041a14;border:1px solid #0d3a2d}
+.cmp-tag{font-size:9px;font-family:var(--mono);font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
+.ct-old{color:#ff9090}.ct-new{color:var(--g)}
+.cmp-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px}
+.cmp-list{font-size:12px;color:var(--muted);line-height:2.1}
+.cmp-list .bad{color:#ff9090}.cmp-list .good{color:var(--g)}
+
+pre{background:#040408;border:1px solid var(--b);border-radius:8px;padding:16px;overflow-x:auto;font-size:12px;line-height:1.8;margin:10px 0}
+pre code{background:none;border:none;padding:0;color:#c0c0e0;font-size:inherit}
+.s{color:var(--g)}.k{color:#c792ea}.cm{color:#3d4a3d;font-style:italic}.hc{color:var(--bl)}.w{color:var(--r)}
+
+table{width:100%;border-collapse:collapse;margin:12px 0 20px;font-size:13px}
+th{background:var(--bg3);border:1px solid var(--b);padding:9px 14px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+td{border:1px solid var(--b);padding:9px 14px;color:#c0c0da;vertical-align:top}
+tr:nth-child(even) td{background:#080810}
+
+.mini-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0}
+.mini-card{background:var(--bg3);border:1px solid var(--b);border-radius:8px;padding:13px 15px}
+.mc-icon{font-size:18px;margin-bottom:5px}
+.mc-title{font-size:12px;font-weight:700;color:var(--text)}
+.mc-desc{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.6}
+
+@media(max-width:900px){
+  .sb{display:none}
+  .main{padding:24px 20px 60px}
+  .arch-diagram,.compare,.mini-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="glow g1"></div>
+<div class="glow g2"></div>
+
+<header>
+  <div class="hi">
+    <div class="logo">⚡ VoiceForge</div>
+    <span class="vtag">Platform Docs v2 · Separated Architecture</span>
+    <div class="hsep"></div>
+    <span class="hpill hp-e">Express Backend</span>
+    <span class="hpill hp-f">Next.js Frontend</span>
+    <span class="hpill hp-d">MongoDB + R2 + Pinecone</span>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="sb">
+  <div class="sg">Overview</div>
+  <a class="sl" href="#why"><span class="d dp"></span>Why Separated?</a>
+  <a class="sl" href="#arch"><span class="d dw"></span>Architecture</a>
+  <a class="sl" href="#always-on"><span class="d dg"></span>Always-On Backend</a>
+  <a class="sl" href="#tech-stack"><span class="d dw"></span>Tech Stack</a>
+  <div class="sg">Workflows</div>
+  <a class="sl" href="#user-workflow"><span class="d dp"></span>User Onboarding</a>
+  <a class="sl" href="#live-call"><span class="d dor"></span>Live Call Flow</a>
+  <a class="sl" href="#rag-workflow"><span class="d dr"></span>RAG Ingestion</a>
+  <a class="sl" href="#credit-workflow"><span class="d da"></span>Credits Lifecycle</a>
+  <div class="sg">Backend Deep Dive</div>
+  <a class="sl" href="#express"><span class="d dg"></span>Express Structure</a>
+  <a class="sl" href="#worker"><span class="d dg"></span>Ingestion Worker</a>
+  <a class="sl" href="#vapi-bridge"><span class="d dor"></span>Vapi Integration</a>
+  <a class="sl" href="#data-models"><span class="d db"></span>Data Models</a>
+  <a class="sl" href="#api-routes"><span class="d dg"></span>API Routes</a>
+  <div class="sg">Frontend Deep Dive</div>
+  <a class="sl" href="#nextjs"><span class="d dp"></span>Next.js Role</a>
+  <a class="sl" href="#jwt-bridge"><span class="d dp"></span>JWT Auth Bridge</a>
+  <a class="sl" href="#fe-pages"><span class="d dp"></span>Pages & Components</a>
+  <a class="sl" href="#state"><span class="d dp"></span>State Management</a>
+  <div class="sg">Infrastructure</div>
+  <a class="sl" href="#deploy"><span class="d da"></span>Deployment</a>
+  <a class="sl" href="#env-vars"><span class="d dw"></span>Env Variables</a>
+  <a class="sl" href="#costs"><span class="d dr"></span>Cost Model</a>
+  <a class="sl" href="#phases"><span class="d dw"></span>Build Phases</a>
+</nav>
+
+<main class="main">
+
+<!-- HERO -->
+<div id="why" class="hero">
+  <div class="hero-eyebrow">// Architecture Decision · Why Two Services?</div>
+  <h1>Your backend is an <em>infrastructure layer</em>,<br/>not a web server</h1>
+  <p>The decision to separate backend from frontend is exactly right — and it's one of the most important structural decisions in this project. Your backend doesn't serve visitors. It runs AI agents for multiple businesses simultaneously, around the clock. Vapi webhooks arrive mid-call whether anyone is visiting your site or not. The ingestion worker processes uploaded PDFs continuously. Credits get deducted when calls end. None of this is triggered by a human clicking a page.</p>
+  <div class="chips">
+    <span class="chip c-g">Express.js — always-on backend</span>
+    <span class="chip c-p">Next.js — frontend control panel only</span>
+    <span class="chip c-b">MongoDB Atlas — persistent data</span>
+    <span class="chip c-b">Cloudflare R2 — file storage</span>
+    <span class="chip c-r">Pinecone — vector store</span>
+    <span class="chip c-a">Vapi.ai — voice orchestration</span>
+    <span class="chip c-a">ElevenLabs — TTS</span>
+    <span class="chip c-a">Deepgram — STT</span>
+    <span class="chip c-w">Railway — backend host</span>
+    <span class="chip c-w">Vercel — frontend host</span>
+  </div>
+</div>
+
+<!-- COMPARISON -->
+<div class="compare">
+  <div class="cmp cmp-old">
+    <div class="cmp-tag ct-old">Old approach — Next.js API Routes only</div>
+    <div class="cmp-title">Everything in one Next.js app</div>
+    <div class="cmp-list">
+      <div class="bad">✗ Serverless cold-start: 200–800ms per invocation</div>
+      <div class="bad">✗ 60s max timeout — ingestion breaks silently</div>
+      <div class="bad">✗ No persistent memory — in-memory cache impossible</div>
+      <div class="bad">✗ Vapi webhook arrives while function is sleeping</div>
+      <div class="bad">✗ Background worker cannot run — no always-on process</div>
+      <div class="bad">✗ Scales with visitor traffic, not agent count</div>
+    </div>
+  </div>
+  <div class="cmp cmp-new">
+    <div class="cmp-tag ct-new">New approach — Separate Express backend</div>
+    <div class="cmp-title">Express always-on + Next.js UI only</div>
+    <div class="cmp-list">
+      <div class="good">✓ Express is warm — zero cold start on webhooks</div>
+      <div class="good">✓ No timeout limits — ingest PDFs for minutes</div>
+      <div class="good">✓ In-memory caches live hours (voice list, etc.)</div>
+      <div class="good">✓ Vapi webhook hits live Express immediately</div>
+      <div class="good">✓ Ingestion worker runs via setInterval forever</div>
+      <div class="good">✓ Scales with agent count, not visitor count</div>
+    </div>
+  </div>
+</div>
+
+<!-- ALWAYS-ON CALLOUT -->
+<div id="always-on" class="always-on">
+  <div class="ao-icon">⚡</div>
+  <div>
+    <div class="ao-title">What "always-on" means in practice</div>
+    <div class="ao-body">
+      Right now, at 3am, while <strong>zero users are on your website</strong>, your Express backend is still:<br/>
+      — Listening for Vapi webhooks from ongoing calls across all your users' agents<br/>
+      — Running the ingestion worker loop, checking for pending docs every 10 seconds<br/>
+      — Holding the ElevenLabs voice list in memory so agents can start calls instantly<br/>
+      — Ready to deduct credits and write full transcripts the moment any call ends<br/><br/>
+      The frontend going offline doesn't interrupt any of this. Think of it like a factory — the factory floor (Express) runs 24/7. The office (Next.js) is only open when someone sits down to use it.
+    </div>
+  </div>
+</div>
+
+<!-- ARCHITECTURE -->
+<div id="arch" class="sh">
+  <span class="sh-n">ARCH</span>
+  <span class="sh-t">System Architecture — Four Layers</span>
+  <div class="sh-l"></div>
+  <span class="sh-b sb-wf">OVERVIEW</span>
+</div>
+
+<div class="arch-diagram">
+  <div class="arch-q aq-fe">
+    <div class="aq-tag t-fe">Frontend · voiceforge-web/ → Vercel</div>
+    <div class="aq-title">Next.js 14 — Control Panel</div>
+    <div class="aq-desc">Purely a user interface. Renders pages, shows call logs, lets users build agents, upload docs, manage billing. Calls the Express backend for all data. Dormant when no one is visiting — and that's fine.</div>
+    <div class="aq-pills"><span class="ap">Next.js 14 App Router</span><span class="ap">NextAuth.js (JWT bridge)</span><span class="ap">Zustand</span><span class="ap">Tailwind + shadcn/ui</span><span class="ap">21st.dev components</span><span class="ap">Axios API client</span></div>
+  </div>
+  <div class="arch-q aq-be">
+    <div class="aq-tag t-be">Backend · voiceforge-api/ → Railway</div>
+    <div class="aq-title">Express.js — Always Running</div>
+    <div class="aq-desc">All business logic. Receives Vapi webhooks mid-call. Runs the ingestion worker loop. Validates JWTs, manages credits, writes transcripts. Never sleeps. Deployed on Railway for ~$5/month.</div>
+    <div class="aq-pills"><span class="ap">Express.js + TypeScript</span><span class="ap">JWT auth</span><span class="ap">Zod validation</span><span class="ap">Vapi webhook handler</span><span class="ap">setInterval worker</span><span class="ap">multer (file uploads)</span></div>
+  </div>
+  <div class="arch-q aq-db">
+    <div class="aq-tag t-db">Data Layer · MongoDB + R2 + Pinecone</div>
+    <div class="aq-title">Persistent Storage (shared)</div>
+    <div class="aq-desc">MongoDB Atlas stores all structured data. Cloudflare R2 stores uploaded files. Pinecone stores vector embeddings namespaced per user. Accessed exclusively by the Express backend — never directly from Next.js.</div>
+    <div class="aq-pills"><span class="ap">MongoDB Atlas</span><span class="ap">Mongoose ODM</span><span class="ap">Cloudflare R2 (S3-compat)</span><span class="ap">Pinecone namespaces</span></div>
+  </div>
+  <div class="arch-q aq-wk">
+    <div class="aq-tag t-wk">Ingestion Worker · Inside Express process</div>
+    <div class="aq-title">Background Worker (no extra deploy)</div>
+    <div class="aq-desc">Because Express runs forever, the PDF ingestion loop runs inside the same Node.js process via setInterval — polling MongoDB for pending docs every 10s. Non-blocking: setInterval doesn't hold the event loop so HTTP requests keep working during ingestion.</div>
+    <div class="aq-pills"><span class="ap">setInterval (10s poll)</span><span class="ap">LangChain loaders</span><span class="ap">OpenAI embeddings</span><span class="ap">Pinecone upsert</span></div>
+  </div>
+</div>
+
+<!-- TECH STACK -->
+<div id="tech-stack" class="sh">
+  <span class="sh-n">STACK</span>
+  <span class="sh-t">Complete Tech Stack</span>
+  <div class="sh-l"></div>
+</div>
+
+<table>
+  <tr><th>Layer</th><th>Technology</th><th>Role</th><th>Lives In</th></tr>
+  <tr><td>Frontend UI</td><td>Next.js 14 App Router + TypeScript</td><td>All user-facing pages. Zero business logic.</td><td>voiceforge-web/</td></tr>
+  <tr><td>Auth (frontend)</td><td>NextAuth.js v5</td><td>Session cookie + JWT bridge to Express backend.</td><td>voiceforge-web/</td></tr>
+  <tr><td>UI Components</td><td>Tailwind CSS + shadcn/ui + 21st.dev</td><td>Design system and pre-built components.</td><td>voiceforge-web/</td></tr>
+  <tr><td>Global State</td><td>Zustand</td><td>Client-side: user credits, agent list, call status.</td><td>voiceforge-web/</td></tr>
+  <tr><td>API Client</td><td>Axios (with JWT interceptor)</td><td>All HTTP calls from Next.js to Express.</td><td>voiceforge-web/</td></tr>
+  <tr><td>Backend Server</td><td>Express.js + TypeScript</td><td>All routes, business logic, always-on.</td><td>voiceforge-api/</td></tr>
+  <tr><td>Auth (backend)</td><td>bcryptjs + jsonwebtoken</td><td>Password hashing, JWT sign/verify.</td><td>voiceforge-api/</td></tr>
+  <tr><td>Validation</td><td>Zod</td><td>Every request body validated before touching DB.</td><td>voiceforge-api/</td></tr>
+  <tr><td>File handling</td><td>multer (memoryStorage)</td><td>Files stay as Buffer — never written to disk.</td><td>voiceforge-api/</td></tr>
+  <tr><td>Database</td><td>MongoDB Atlas + Mongoose</td><td>All structured data.</td><td>Cloud (shared)</td></tr>
+  <tr><td>File Storage</td><td>Cloudflare R2</td><td>PDFs, DOCX, scraped text blobs. Zero egress fee.</td><td>Cloud (shared)</td></tr>
+  <tr><td>Vector Store</td><td>Pinecone</td><td>Per-user namespaced embeddings for RAG.</td><td>Cloud (shared)</td></tr>
+  <tr><td>RAG Framework</td><td>LangChain (Node.js)</td><td>Document loading, chunking, embedding pipeline.</td><td>voiceforge-api/</td></tr>
+  <tr><td>Embeddings</td><td>OpenAI text-embedding-3-small</td><td>Same model for ingest AND query — critical match.</td><td>Cloud API</td></tr>
+  <tr><td>LLM</td><td>OpenAI GPT-4o / GPT-4o-mini</td><td>Agent reasoning during live calls.</td><td>Cloud API</td></tr>
+  <tr><td>Voice Orchestration</td><td>Vapi.ai</td><td>Manages call lifecycle + STT/LLM/TTS pipeline.</td><td>Cloud API</td></tr>
+  <tr><td>TTS</td><td>ElevenLabs</td><td>Text-to-speech. Plugged into Vapi as provider.</td><td>Cloud API</td></tr>
+  <tr><td>STT</td><td>Deepgram Nova-3</td><td>Speech-to-text. Plugged into Vapi as provider.</td><td>Cloud API</td></tr>
+  <tr><td>Telephony</td><td>Twilio (via Vapi)</td><td>PSTN calls. We write zero Twilio code.</td><td>Cloud API</td></tr>
+  <tr><td>Web Scraping</td><td>Cheerio + node-fetch</td><td>Scrape public URLs into the knowledge base.</td><td>voiceforge-api/</td></tr>
+  <tr><td>Payment (stub)</td><td>Razorpay</td><td>Gateway exists, not wired to real UI yet.</td><td>voiceforge-api/</td></tr>
+</table>
+
+<!-- FLOW 1: USER WORKFLOW -->
+<div id="user-workflow" class="sh">
+  <span class="sh-n">FLOW 1</span>
+  <span class="sh-t">User Onboarding & Agent Setup</span>
+  <div class="sh-l"></div>
+  <span class="sh-b sb-fe">FRONTEND-TRIGGERED</span>
+</div>
+
+<p>This flow only happens when a user is actively on the platform. Every step is initiated by someone clicking in the Next.js UI. The Express backend handles the actual work.</p>
+
+<div class="wf-chain">
+  <div class="wf-step">
+    <div class="wf-num wn-p">1</div>
+    <div class="wf-content">
+      <div class="wf-title">Register or log in</div>
+      <div class="wf-desc">Login form → <code>POST {API_URL}/api/auth/register</code> or <code>/login</code>. Express validates credentials, hashes password with bcrypt, creates a User in MongoDB with 50 free credits, returns a <strong>JWT token</strong>. NextAuth stores this token in a secure session cookie. All future API calls include <code>Authorization: Bearer {token}</code> automatically via the Axios interceptor.</div>
+    </div>
+  </div>
+  <div class="wf-step">
+    <div class="wf-num wn-p">2</div>
+    <div class="wf-content">
+      <div class="wf-title">Create an Agent via the 4-step wizard</div>
+      <div class="wf-desc">The wizard accumulates choices in Zustand draft state — role (Sales / Support / Tech / Custom), business description (becomes the system prompt), ElevenLabs voice selection, and temperature. On "Create Agent": <code>POST /api/agents</code> → Express creates an Agent in MongoDB → calls Vapi API to provision an assistant (registers our webhook URL, sets voice/transcriber/model config) → saves the returned <code>vapiAgentId</code>. The agent is now live in Vapi and ready to take calls.</div>
+      <div class="sub-steps">
+        <span class="hl">Vapi receives:</span> voice: 11labs {voiceId} · transcriber: deepgram nova-3
+        model: gpt-4o with system prompt from business description
+        serverUrl: https://api.voiceforge.app/api/calls/webhook
+      </div>
+    </div>
+  </div>
+  <div class="wf-step">
+    <div class="wf-num wn-p">3</div>
+    <div class="wf-content">
+      <div class="wf-title">Upload knowledge documents</div>
+      <div class="wf-desc">User drags PDFs or DOCX onto the knowledge page. Next.js sends <code>multipart/form-data</code> to <code>POST /api/knowledge/upload</code>. Express receives the file via multer (in memory as a Buffer — never touches disk), uploads it to <strong>Cloudflare R2</strong>, creates a KnowledgeDoc with <code>status: 'pending'</code>, and deducts 5 credits. Returns immediately. The frontend polls <code>GET /api/knowledge/status/:docId</code> every 3s to show progress.</div>
+    </div>
+  </div>
+  <div class="wf-step">
+    <div class="wf-num wn-g">4</div>
+    <div class="wf-content">
+      <div class="wf-title">Background worker ingests the document</div>
+      <div class="wf-desc">The <code>setInterval</code> worker inside Express polls MongoDB every 10 seconds. Finds the pending doc, downloads it from R2 via presigned URL, runs LangChain (PDFLoader → RecursiveCharacterTextSplitter → OpenAI embeddings), upserts all chunks into <strong>Pinecone</strong> under the user's namespace, and sets status to <code>'ready'</code>. The frontend polling sees the change and shows a green "Ready · 124 chunks" badge.</div>
+    </div>
+  </div>
+  <div class="wf-step">
+    <div class="wf-num wn-p">5</div>
+    <div class="wf-content">
+      <div class="wf-title">Optionally scrape web URLs</div>
+      <div class="wf-desc">User pastes a URL (product page, competitor site, company blog). <code>POST /api/knowledge/scrape</code> → Express fetches with Cheerio, strips nav/footer/scripts, extracts clean text, uploads to R2. Same pipeline as file upload. 2 credits deducted. Worker ingests it identically.</div>
+    </div>
+  </div>
+  <div class="wf-step">
+    <div class="wf-num wn-p">6</div>
+    <div class="wf-content">
+      <div class="wf-title">Buy more credits (currently stub)</div>
+      <div class="wf-desc">Billing page shows 3 packs (Starter ₹199 / Growth ₹799 / Business ₹2499). Clicking "Buy Now" calls <code>POST /api/credits/purchase</code>. Currently stubbed — Express adds credits without real payment verification. When Razorpay is wired in, the HMAC signature from Razorpay's webhook will be verified before any credits are added.</div>
+    </div>
+  </div>
+</div>
+
+<!-- FLOW 2: LIVE CALL -->
+<div id="live-call" class="sh">
+  <span class="sh-n">FLOW 2</span>
+  <span class="sh-t">Live Call Workflow — Most Important Flow</span>
+  <div class="sh-l"></div>
+  <span class="sh-b sb-or">BACKEND-DRIVEN · NO UI REQUIRED</span>
+</div>
+
+<div class="ib ib-a"><span class="ico">⚑</span><p>This entire flow runs while the user <strong>may not be on the website at all</strong>. The Express backend handles every step autonomously. This is the core reason the backend must always be running.</p></div>
+
+<div class="wf-chain">
+  <div class="wf-step">
+    <div class="wf-num wn-p">1</div>
+    <div class="wf-content">
+      <div class="wf-title">User triggers an outbound call</div>
+      <div class="wf-desc">From the agent detail page, user enters a phone number and clicks "Start Call". Next.js sends <code>POST /api/calls/outbound { agentId, toNumber }</code>. Express validates, checks credits ≥ 5, finds the agent's <code>vapiAgentId</code>, calls Vapi's API to initiate the call, creates a CallLog with <code>status: 'initiated'</code>, and returns the <code>vapiCallId</code> immediately to the frontend.</div>
+    </div>
+  </div>
+  <div class="wf-step">
+    <div class="wf-num wn-a">2</div>
+    <div class="wf-content">
+      <div class="wf-title">Vapi dials via Twilio</div>
+      <div class="wf-desc">Vapi uses the Twilio number assigned to the assistant to place the PSTN call. We write zero Twilio code — Vapi manages the entire telephony layer. The callee's phone rings. When they answer, the call session begins and Vapi starts the real-time STT → LLM → TTS loop.</div>
+    </div>
+  </div>
+  <div class="wf-step">
+    <div class="wf-num wn-a">3</div>
+    <div class="wf-content">
+      <div class="wf-title">Callee speaks → Deepgram transcribes</div>
+      <div class="wf-desc">The callee's voice streams in real-time to <strong>Deepgram Nova-3</strong> (plugged into Vapi as the STT provider). Deepgram returns a text transcript in under 300ms. Vapi now needs relevant context before generating a response, so it fires our context webhook.</div>
+    </div>
+  </div>
+  <div class="wf-step">
+    <div class="wf-num wn-g">4</div>
+    <div class="wf-content">
+      <div class="wf-title">Vapi fires our context webhook — backend must respond fast</div>
+      <div class="wf-desc">Vapi sends <code>POST /api/calls/webhook</code> with event type <code>function-call</code>, passing the transcribed text as the <code>query</code> and the <code>userId</code> in parameters. <strong>This must respond in under 500ms or Vapi skips context.</strong> Express calls <code>retrieveContext(userId, query, 5)</code> — embeds the query, queries Pinecone in the user's namespace, returns the top 5 most semantically relevant document chunks back to Vapi.</div>
+      <div class="sub-steps">
+        <span class="hl">Pinecone query:</span> embed query text → vector search in user namespace → top-5 chunks (score &gt; 0.6)
+        <span class="warn">Latency target:</span> ≤ 400ms round-trip · Express being warm = no cold start = achievable
+      </div>
+    </div>
+  </div>
+  <div class="wf-step">
+    <div class="wf-num wn-a">5</div>
+    <div class="wf-content">
+      <div class="wf-title">GPT-4o generates the agent's response</div>
+      <div class="wf-desc">Vapi combines the retrieved chunks + the full conversation history and sends it to <strong>GPT-4o</strong>. The system prompt (built from the agent's role and business description) instructs the model to stay grounded in the context and be concise. GPT-4o generates the agent's reply — typically 1–2 sentences for natural phone conversation pacing.</div>
+    </div>
+  </div>
+  <div class="wf-step">
+    <div class="wf-num wn-a">6</div>
+    <div class="wf-content">
+      <div class="wf-title">ElevenLabs speaks the response</div>
+      <div class="wf-desc">The reply text goes to <strong>ElevenLabs TTS</strong> using the voice the user selected in the wizard. ElevenLabs synthesizes audio and streams it back through Vapi → Twilio → to the callee's phone. End-to-end latency (callee finishes speaking → hears AI response) is typically 600–900ms, which sounds natural on a phone call.</div>
+    </div>
+  </div>
+  <div class="wf-step">
+    <div class="wf-num wn-g">7</div>
+    <div class="wf-content">
+      <div class="wf-title">Call ends → backend handles all cleanup</div>
+      <div class="wf-desc">When either party hangs up, Vapi sends an <code>end-of-call-report</code> webhook to Express. The handler: calculates <code>durationSec</code>, computes <code>creditsUsed = ceil(durationSec/60) × 3</code>, updates the CallLog with the full transcript and <code>status: 'completed'</code>, atomically deducts credits from the user, and writes a CreditLedger entry. The frontend polling the call status eventually sees <code>completed</code>.</div>
+      <div class="sub-steps">
+        <span class="hl">CallLog updated:</span> status='completed' · transcript[] · durationSec · creditsUsed · endedAt
+        <span class="hl">User credits:</span> $inc({ credits: -creditsUsed }) — atomic MongoDB update
+        <span class="hl">CreditLedger:</span> { type:'deduct', amount: -N, description: 'Outbound call Xs to +91...' }
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FLOW 3: RAG -->
+<div id="rag-workflow" class="sh">
+  <span class="sh-n">FLOW 3</span>
+  <span class="sh-t">RAG Ingestion Workflow</span>
+  <div class="sh-l"></div>
+  <span class="sh-b sb-rag">ASYNC · WORKER-DRIVEN</span>
+</div>
+
+<p>Document ingestion is intentionally asynchronous. The API returns immediately after uploading to R2. The actual chunking, embedding, and Pinecone indexing happens in the background worker — which can take 10 seconds to several minutes for large PDFs. The frontend shows a live status badge by polling.</p>
+
+<div class="wf-chain">
+  <div class="wf-step">
+    <div class="wf-num wn-p">1</div>
+    <div class="wf-content">
+      <div class="wf-title">File arrives at Express via multer</div>
+      <div class="wf-desc">Multipart form data → multer puts the file Buffer in memory (never written to disk — safer and works on any host). Validated: must be pdf/docx/txt, under 10MB. <strong>5 credits are checked and deducted immediately</strong> — this prevents uploads without sufficient balance before any expensive work begins.</div>
+    </div>
+  </div>
+  <div class="wf-step">
+    <div class="wf-num wn-a">2</div>
+    <div class="wf-content">
+      <div class="wf-title">Buffer uploaded to Cloudflare R2</div>
+      <div class="wf-desc">Uploaded to key <code>users/{userId}/docs/{docId}-{filename}</code> using the AWS SDK (R2 is S3-compatible). The worker later downloads this same file from R2 — on AWS S3 that egress would cost money. On R2 it's free, which is why we chose Cloudflare R2.</div>
+    </div>
+  </div>
+  <div class="wf-step">
+    <div class="wf-num wn-a">3</div>
+    <div class="wf-content">
+      <div class="wf-title">KnowledgeDoc created as 'pending'</div>
+      <div class="wf-desc">MongoDB record: <code>{ userId, r2Key, filename, type, status: 'pending' }</code>. API returns <code>{ docId, status: 'pending' }</code> to the frontend immediately. User sees a spinner. The actual ingestion hasn't started yet.</div>
+    </div>
+  </div>
+  <div class="wf-step">
+    <div class="wf-num wn-g">4</div>
+    <div class="wf-content">
+      <div class="wf-title">Worker picks it up within 10 seconds</div>
+      <div class="wf-desc">The <code>setInterval(tick, 10000)</code> loop running inside Express finds the pending doc. Sets status to <code>'processing'</code>. Downloads from R2 via presigned URL. Feeds it to the right LangChain loader: PDFLoader for PDFs, DocxLoader for Word files, plain string for TXT/scraped content.</div>
+    </div>
+  </div>
+  <div class="wf-step">
+    <div class="wf-num wn-g">5</div>
+    <div class="wf-content">
+      <div class="wf-title">Chunking and embedding</div>
+      <div class="wf-desc"><code>RecursiveCharacterTextSplitter</code> splits into 1000-character chunks with 150-character overlap. Overlap prevents context from being lost at chunk boundaries. OpenAI <code>text-embedding-3-small</code> converts each chunk to a 1536-dimension vector. <strong>The same embedding model must be used at query time</strong> — mixing models breaks semantic similarity completely.</div>
+    </div>
+  </div>
+  <div class="wf-step">
+    <div class="wf-num wn-g">6</div>
+    <div class="wf-content">
+      <div class="wf-title">Vectors upserted to Pinecone with user namespace</div>
+      <div class="wf-desc">All chunk vectors go to Pinecone under <code>namespace = userId.toString()</code>. This namespace isolation means Company A's documents are completely invisible when Company B's agent queries Pinecone — critical for a multi-tenant platform. Pinecone creates the namespace automatically on first upsert.</div>
+      <div class="sub-steps">
+        <span class="hl">Namespace = userId</span> → complete data isolation per customer
+        user_abc → namespace "abc" | user_xyz → namespace "xyz"
+        <span class="dim">These namespaces never cross-contaminate during similarity search</span>
+      </div>
+    </div>
+  </div>
+  <div class="wf-step">
+    <div class="wf-num wn-g">7</div>
+    <div class="wf-content">
+      <div class="wf-title">Doc marked 'ready' — agent can use it immediately</div>
+      <div class="wf-desc">KnowledgeDoc updated: <code>{ status: 'ready', chunkCount: N, pineconeNS: userId }</code>. Frontend polling sees the change and shows a green "Ready · 124 chunks" badge. The next call this agent makes will now retrieve from these chunks.</div>
+    </div>
+  </div>
+</div>
+
+<!-- FLOW 4: CREDITS -->
+<div id="credit-workflow" class="sh">
+  <span class="sh-n">FLOW 4</span>
+  <span class="sh-t">Credits Lifecycle</span>
+  <div class="sh-l"></div>
+  <span class="sh-b sb-wf">LEDGER SYSTEM</span>
+</div>
+
+<p>Credits are the platform's internal currency. Every debit and credit is recorded in the <code>CreditLedger</code> collection for audit purposes. The balance on the User document is for fast reads; the ledger is the source of truth for history.</p>
+
+<table>
+  <tr><th>Event</th><th>Credits</th><th>When Deducted</th><th>Ledger Type</th></tr>
+  <tr><td>Sign-up bonus</td><td>+50</td><td>At registration</td><td>bonus</td></tr>
+  <tr><td>Buy Starter pack</td><td>+100</td><td>On purchase confirm</td><td>purchase</td></tr>
+  <tr><td>Buy Growth pack</td><td>+500</td><td>On purchase confirm</td><td>purchase</td></tr>
+  <tr><td>Buy Business pack</td><td>+2000</td><td>On purchase confirm</td><td>purchase</td></tr>
+  <tr><td>Document upload</td><td>−5 per file</td><td>Before R2 upload</td><td>deduct</td></tr>
+  <tr><td>Web scrape</td><td>−2 per URL</td><td>Before scraping</td><td>deduct</td></tr>
+  <tr><td>Outbound call</td><td>−3 per minute (ceil)</td><td>At end-of-call webhook</td><td>deduct + callLogId</td></tr>
+  <tr><td>Inbound call</td><td>−2 per minute (ceil)</td><td>At end-of-call webhook</td><td>deduct + callLogId</td></tr>
+</table>
+
+<div class="ib ib-b"><span class="ico">ℹ</span><p><strong>Why call credits are deducted at the end, not the start:</strong> We don't know the call duration until it ends. A pre-flight check (≥5 credits) prevents zero-credit calls from starting, but the real deduction matches the actual duration. The end-of-call webhook fires from Vapi and is handled entirely by Express — no UI involved, works even if the user has closed the browser.</p></div>
+
+<!-- EXPRESS STRUCTURE -->
+<div id="express" class="sh">
+  <span class="sh-n">BE</span>
+  <span class="sh-t">Express Server Structure</span>
+  <div class="sh-l"></div>
+  <span class="sh-b sb-be">voiceforge-api/</span>
+</div>
+
+<pre><code>voiceforge-api/src/
+├── index.ts             <span class="cm">← Express app entry. Boots DB, registers routes, starts worker.</span>
+├── config.ts            <span class="cm">← Typed env config. Throws immediately if any required var is missing.</span>
+├── db/
+│   ├── mongoose.ts      <span class="cm">← Single connection (long-lived process = one persistent connection)</span>
+│   ├── models/          <span class="cm">← User, Agent, KnowledgeDoc, CallLog, CreditLedger</span>
+│   └── index.ts         <span class="cm">← Barrel export of all models</span>
+├── middleware/
+│   ├── auth.ts          <span class="cm">← requireAuth: verifies JWT, populates req.user</span>
+│   ├── validate.ts      <span class="cm">← validate(schema): Zod middleware factory</span>
+│   └── errorHandler.ts  <span class="cm">← Global error handler + AppError class</span>
+├── routes/
+│   ├── auth.routes.ts      <span class="cm">← POST /register /login · GET /me</span>
+│   ├── agents.routes.ts    <span class="cm">← CRUD + Vapi assistant provisioning</span>
+│   ├── calls.routes.ts     <span class="cm">← outbound trigger + webhook + call history</span>
+│   ├── knowledge.routes.ts <span class="cm">← file upload + web scrape + status check</span>
+│   ├── credits.routes.ts   <span class="cm">← balance + transaction history + purchase stub</span>
+│   └── voices.routes.ts    <span class="cm">← ElevenLabs proxy with in-memory 1hr cache</span>
+├── services/
+│   ├── vapi.service.ts     <span class="cm">← createAssistant / updateAssistant / deleteAssistant</span>
+│   ├── r2.service.ts       <span class="cm">← uploadToR2 / getPresignedUrl / deleteFromR2</span>
+│   ├── scraper.service.ts  <span class="cm">← scrapeUrl(url): string via Cheerio</span>
+│   └── credits.service.ts  <span class="cm">← deductCredits / addCredits / COSTS constant</span>
+├── rag/
+│   ├── ingest.ts        <span class="cm">← ingestDocument(docId): LangChain → Pinecone</span>
+│   └── retrieve.ts      <span class="cm">← retrieveContext(userId, query, topK): string[]</span>
+└── worker/
+    └── index.ts         <span class="cm">← startWorker(): non-blocking setInterval polling loop</span></code></pre>
+
+<h3>Critical middleware order in index.ts</h3>
+<pre><code><span class="cm">// ⚠ ORDER IS CRITICAL — do NOT change</span>
+<span class="cm">// Raw body MUST be registered BEFORE express.json()</span>
+<span class="cm">// Vapi sends webhooks and we need the raw Buffer to verify the signature</span>
+app.use('/api/calls/webhook', express.raw({ type: 'application/json' }))
+app.use(express.json({ limit: '10mb' }))
+
+<span class="cm">// Inside the webhook handler, parse the raw body manually:</span>
+const body = JSON.parse(req.body.toString('utf8'))
+const secret = req.headers['x-vapi-secret']
+if (secret !== config.vapi.webhookSecret) return res.status(401).json({})</code></pre>
+
+<!-- WORKER -->
+<div id="worker" class="sh">
+  <span class="sh-n">WORKER</span>
+  <span class="sh-t">Ingestion Worker — Why setInterval, Not a Loop</span>
+  <div class="sh-l"></div>
+  <span class="sh-b sb-be">NON-BLOCKING DESIGN</span>
+</div>
+
+<pre><code><span class="cm">// src/worker/index.ts</span>
+<span class="cm">// Called once from index.ts: startWorker()</span>
+<span class="cm">// Runs inside the same Express process — no extra deployment</span>
+
+export function startWorker(intervalMs = 10_000) {
+  const tick = async () => {
+    const pending = await KnowledgeDoc.find({ status: 'pending' }).limit(3)
+    for (const doc of pending) {
+      await ingestDocument(doc._id.toString())
+    }
+  }
+  tick() <span class="cm">// run once immediately on startup</span>
+  return setInterval(tick, intervalMs) <span class="cm">// then every 10s</span>
+}
+
+<span class="cm">// WHY setInterval and not while(true) with await sleep():</span>
+<span class="cm">// setInterval is non-blocking. Node.js continues processing HTTP requests,</span>
+<span class="cm">// webhook calls, and database queries between ticks.</span>
+<span class="cm">// A while(true) loop would block the event loop during await, freezing Express.</span></code></pre>
+
+<!-- VAPI BRIDGE -->
+<div id="vapi-bridge" class="sh">
+  <span class="sh-n">VAPI</span>
+  <span class="sh-t">How Vapi Connects to Our Backend</span>
+  <div class="sh-l"></div>
+  <span class="sh-b sb-or">WEBHOOK-BASED INTEGRATION</span>
+</div>
+
+<p>Vapi is the voice orchestration layer. We give Vapi three things: a TTS voice (ElevenLabs), an STT provider (Deepgram), and a <strong>serverUrl</strong> pointing to our Express backend. During calls, Vapi calls our serverUrl for real-time context and to report end-of-call events.</p>
+
+<div class="mini-grid">
+  <div class="mini-card">
+    <div class="mc-icon">📤</div>
+    <div class="mc-title">When we call Vapi</div>
+    <div class="mc-desc">Agent creation (POST /assistant), outbound call trigger (POST /call/phone), agent config update (PATCH /assistant/:id), agent delete (DELETE /assistant/:id).</div>
+  </div>
+  <div class="mini-card">
+    <div class="mc-icon">📥</div>
+    <div class="mc-title">When Vapi calls us</div>
+    <div class="mc-desc">function-call (get RAG context mid-call), status-update (call state changed), end-of-call-report (full transcript + duration). All arrive at POST /api/calls/webhook.</div>
+  </div>
+  <div class="mini-card">
+    <div class="mc-icon">⏱</div>
+    <div class="mc-title">Latency requirement</div>
+    <div class="mc-desc">The function-call webhook must respond in under 500ms. Express being warm (no cold start) makes this achievable. Pinecone query takes ~80–150ms typically.</div>
+  </div>
+</div>
+
+<h3>What gets sent to Vapi when an agent is created</h3>
+<pre><code><span class="cm">// Express → POST https://api.vapi.ai/assistant</span>
+{
+  <span class="k">name</span>: "Sarah",
+  <span class="k">voice</span>: { provider: "11labs", voiceId: "21m00Tcm4TlvDq8ikWAM" },
+  <span class="k">transcriber</span>: { provider: "deepgram", model: "nova-3", language: "en-US" },
+  <span class="k">model</span>: {
+    provider: "openai",
+    model: "gpt-4o",
+    systemPrompt: "You are Sarah, a sales agent for Acme Dental Clinic...",
+    temperature: 0.7
+  },
+  <span class="k">serverUrl</span>: "https://api.voiceforge.app/api/calls/webhook"
+  <span class="cm">// ↑ Vapi will POST to this URL during every call this agent makes</span>
+}</code></pre>
+
+<!-- DATA MODELS -->
+<div id="data-models" class="sh">
+  <span class="sh-n">DB</span>
+  <span class="sh-t">Data Models</span>
+  <div class="sh-l"></div>
+  <span class="sh-b sb-db">MONGODB · MONGOOSE</span>
+</div>
+
+<h3>User</h3>
+<pre><code>{ name, email, passwordHash?, provider: 'credentials'|'google',
+  credits: Number (default 50), vapiUserId?, plan: 'free'|'starter'|'growth'|'business',
+  createdAt }</code></pre>
+
+<h3>Agent</h3>
+<pre><code>{ userId→User, name, role: 'support'|'sales'|'tech'|'custom',
+  description (→ system prompt), voiceId, voiceName, phoneNumber?,
+  vapiAgentId (returned by Vapi on creation), knowledgeDocs→[],
+  isActive, language, temperature, createdAt, updatedAt }</code></pre>
+
+<h3>KnowledgeDoc</h3>
+<pre><code>{ userId→User, agentId→Agent?, type: 'pdf'|'docx'|'txt'|'url'|'scrape',
+  filename?, r2Key, sourceUrl?, status: 'pending'|'processing'|'ready'|'error',
+  chunkCount?, pineconeNS (= userId string), errorMsg?, uploadedAt }</code></pre>
+
+<h3>CallLog</h3>
+<pre><code>{ userId→User, agentId→Agent, vapiCallId (indexed for fast webhook lookup),
+  direction: 'inbound'|'outbound', toNumber, fromNumber,
+  status: 'initiated'|'in-progress'|'completed'|'failed',
+  durationSec?, transcript: [{ role, text, timestamp }],
+  creditsUsed?, outcome: 'converted'|'follow-up'|'no-answer'|'other',
+  startedAt, endedAt, createdAt }</code></pre>
+
+<h3>CreditLedger</h3>
+<pre><code>{ userId→User, type: 'purchase'|'deduct'|'refund'|'bonus',
+  amount (positive = credit in, negative = debit out), description,
+  callLogId→CallLog?, paymentRef?, createdAt }</code></pre>
+
+<!-- API ROUTES -->
+<div id="api-routes" class="sh">
+  <span class="sh-n">ROUTES</span>
+  <span class="sh-t">Express API Routes Reference</span>
+  <div class="sh-l"></div>
+  <span class="sh-b sb-be">ALL IN voiceforge-api/</span>
+</div>
+
+<table>
+  <tr><th>Method</th><th>Route</th><th>Auth</th><th>Description</th></tr>
+  <tr><td>POST</td><td>/api/auth/register</td><td>—</td><td>Create account → returns JWT</td></tr>
+  <tr><td>POST</td><td>/api/auth/login</td><td>—</td><td>Validate credentials → returns JWT</td></tr>
+  <tr><td>GET</td><td>/api/auth/me</td><td>JWT</td><td>Return current user from DB</td></tr>
+  <tr><td>GET</td><td>/api/agents</td><td>JWT</td><td>List user's agents</td></tr>
+  <tr><td>POST</td><td>/api/agents</td><td>JWT</td><td>Create agent + provision Vapi assistant</td></tr>
+  <tr><td>GET</td><td>/api/agents/:id</td><td>JWT</td><td>Single agent with populated docs</td></tr>
+  <tr><td>PATCH</td><td>/api/agents/:id</td><td>JWT</td><td>Update agent + sync changes to Vapi</td></tr>
+  <tr><td>DELETE</td><td>/api/agents/:id</td><td>JWT</td><td>Delete agent + remove from Vapi</td></tr>
+  <tr><td>POST</td><td>/api/calls/outbound</td><td>JWT</td><td>Trigger outbound call via Vapi</td></tr>
+  <tr><td><strong>POST</strong></td><td><strong>/api/calls/webhook</strong></td><td><strong>secret header</strong></td><td><strong>Vapi events: context injection + end-of-call</strong></td></tr>
+  <tr><td>GET</td><td>/api/calls</td><td>JWT</td><td>Paginated call history</td></tr>
+  <tr><td>GET</td><td>/api/calls/:id</td><td>JWT</td><td>Full call detail + transcript</td></tr>
+  <tr><td>POST</td><td>/api/knowledge/upload</td><td>JWT</td><td>File → R2 → KnowledgeDoc (pending)</td></tr>
+  <tr><td>POST</td><td>/api/knowledge/scrape</td><td>JWT</td><td>URL → scrape → R2 → KnowledgeDoc (pending)</td></tr>
+  <tr><td>GET</td><td>/api/knowledge/status/:id</td><td>JWT</td><td>Poll ingestion status</td></tr>
+  <tr><td>GET</td><td>/api/credits</td><td>JWT</td><td>Balance + last 15 ledger entries</td></tr>
+  <tr><td>POST</td><td>/api/credits/purchase</td><td>JWT</td><td>Add credits (stub for now)</td></tr>
+  <tr><td>GET</td><td>/api/voices</td><td>—</td><td>ElevenLabs voice list (memory-cached 1hr)</td></tr>
+  <tr><td>GET</td><td>/health</td><td>—</td><td>Health check for Railway uptime monitor</td></tr>
+</table>
+
+<!-- NEXT.JS ROLE -->
+<div id="nextjs" class="sh">
+  <span class="sh-n">FE</span>
+  <span class="sh-t">What Next.js Actually Does</span>
+  <div class="sh-l"></div>
+  <span class="sh-b sb-fe">voiceforge-web/ — CONTROL PANEL ONLY</span>
+</div>
+
+<p>Next.js in this architecture is a React app with SSR and a clean URL structure. It does not touch MongoDB. It does not process files. It does not call Vapi. It calls one place for everything: the Express backend at <code>NEXT_PUBLIC_API_URL</code>. There is exactly <strong>one Next.js API route</strong> — <code>/api/auth/[...nextauth]</code> — which exists solely to handle the NextAuth session cookie machinery.</p>
+
+<div class="mini-grid">
+  <div class="mini-card">
+    <div class="mc-icon">🖥</div>
+    <div class="mc-title">Server Components</div>
+    <div class="mc-desc">Dashboard overview, call detail, agent detail — rendered server-side using a <code>serverFetch()</code> helper that reads the backend JWT from the NextAuth session and attaches it to the fetch call.</div>
+  </div>
+  <div class="mini-card">
+    <div class="mc-icon">⚡</div>
+    <div class="mc-title">Client Components</div>
+    <div class="mc-desc">Agent wizard, voice picker, call initiator with live timer, file uploader with polling, credit badge. All use Zustand for local state and SWR for data fetching.</div>
+  </div>
+  <div class="mini-card">
+    <div class="mc-icon">🔒</div>
+    <div class="mc-title">NextAuth — JWT Bridge Only</div>
+    <div class="mc-desc">NextAuth exists only to store the Express-issued JWT in a secure HttpOnly cookie. It calls <code>/api/auth/login</code> on Express, gets back a token, and gives the browser a session. That's its entire job.</div>
+  </div>
+</div>
+
+<!-- JWT BRIDGE -->
+<div id="jwt-bridge" class="sh">
+  <span class="sh-n">AUTH</span>
+  <span class="sh-t">The JWT Auth Bridge — Exactly How It Works</span>
+  <div class="sh-l"></div>
+</div>
+
+<pre><code><span class="cm">// Step 1: User logs in on Next.js</span>
+signIn('credentials', { email, password })
+  → NextAuth calls Express: POST http://localhost:4000/api/auth/login
+  → Express validates password, signs JWT, returns { token, user }
+  → NextAuth stores { backendToken: token } in its session JWT
+  → Browser receives a secure HttpOnly session cookie
+
+<span class="cm">// Step 2: Browser makes any API call (lib/api.ts Axios interceptor)</span>
+const session = await getSession()
+config.headers.Authorization = `Bearer ${session.backendToken}`
+  → Express receives the token, verifyToken() checks the signature
+  → req.user = { userId, email } is attached to the request
+  → Route handler proceeds with verified identity
+
+<span class="cm">// Step 3: Server-side page rendering (for fast initial load)</span>
+const session = await auth()  <span class="cm">// NextAuth server helper</span>
+const data = await fetch(`${process.env.API_URL}/api/agents`, {
+  headers: { Authorization: `Bearer ${session.backendToken}` }
+})</code></pre>
+
+<!-- FE PAGES -->
+<div id="fe-pages" class="sh">
+  <span class="sh-n">FE</span>
+  <span class="sh-t">Pages & Components</span>
+  <div class="sh-l"></div>
+  <span class="sh-b sb-fe">NEXT.JS APP ROUTER</span>
+</div>
+
+<pre><code>voiceforge-web/app/
+├── page.tsx                         <span class="cm">← Landing page (21st.dev animated hero)</span>
+├── (auth)/
+│   ├── login/page.tsx               <span class="cm">← signIn('credentials') → Express /login</span>
+│   └── register/page.tsx            <span class="cm">← POST to Express /api/auth/register</span>
+├── dashboard/
+│   ├── layout.tsx                   <span class="cm">← Server: auth() check + sidebar shell</span>
+│   ├── page.tsx                     <span class="cm">← Stats cards + recent calls (server-rendered)</span>
+│   ├── agents/
+│   │   ├── page.tsx                 <span class="cm">← Agent list (useSWR)</span>
+│   │   ├── new/page.tsx             <span class="cm">← 4-step wizard ("use client", Zustand draft)</span>
+│   │   └── [id]/page.tsx            <span class="cm">← Agent detail + CallInitiator component</span>
+│   ├── calls/
+│   │   ├── page.tsx                 <span class="cm">← Paginated call history table</span>
+│   │   └── [id]/page.tsx            <span class="cm">← Full transcript chat-bubble view</span>
+│   ├── knowledge/page.tsx           <span class="cm">← Dropzone upload + scrape + polling status list</span>
+│   └── billing/page.tsx             <span class="cm">← Credit balance + pricing packs + history</span>
+└── api/
+    └── auth/[...nextauth]/route.ts  <span class="cm">← THE ONLY Next.js API route</span></code></pre>
+
+<!-- STATE -->
+<div id="state" class="sh">
+  <span class="sh-n">STATE</span>
+  <span class="sh-t">Frontend State Management</span>
+  <div class="sh-l"></div>
+</div>
+
+<table>
+  <tr><th>Store</th><th>What it holds</th><th>When updated</th></tr>
+  <tr><td><code>useUserStore</code></td><td>id, name, email, credits, plan</td><td>On login, on credit purchase or deduction, on any page that shows the credit badge</td></tr>
+  <tr><td><code>useAgentStore</code></td><td>agents list, current wizard draft</td><td>On agent CRUD, on each wizard step advance</td></tr>
+  <tr><td><code>useCallStore</code></td><td>calls list, active call status and timer</td><td>On call start, on each status poll response</td></tr>
+</table>
+
+<p>SWR handles all data fetching with automatic caching and revalidation. Zustand holds state that needs to persist across page navigations without re-fetching — primarily the credit balance displayed in the sidebar on every page, and the wizard draft so navigating back doesn't lose data.</p>
+
+<!-- DEPLOYMENT -->
+<div id="deploy" class="sh">
+  <span class="sh-n">DEPLOY</span>
+  <span class="sh-t">Deployment</span>
+  <div class="sh-l"></div>
+</div>
+
+<div class="mini-grid">
+  <div class="mini-card">
+    <div class="mc-icon">🟢</div>
+    <div class="mc-title">Backend → Railway</div>
+    <div class="mc-desc">~$5/month Starter plan. Always-on Node.js process. Auto-deploys on git push. Add <code>/health</code> as a health check endpoint so Railway auto-restarts if the process crashes. Set all env vars in the Railway dashboard.</div>
+  </div>
+  <div class="mini-card">
+    <div class="mc-icon">▲</div>
+    <div class="mc-title">Frontend → Vercel</div>
+    <div class="mc-desc">Free tier works fine. Connect to GitHub for auto-deploy. Set <code>NEXT_PUBLIC_API_URL</code> to your Railway backend URL. Set <code>API_URL</code> (same value, for server components). Add <code>NEXTAUTH_SECRET</code> and <code>NEXTAUTH_URL</code>.</div>
+  </div>
+  <div class="mini-card">
+    <div class="mc-icon">🔗</div>
+    <div class="mc-title">Local Dev → ngrok</div>
+    <div class="mc-desc">Vapi needs a public HTTPS URL to fire webhooks. Run <code>ngrok http 4000</code> → set <code>API_PUBLIC_URL</code> in your <code>.env</code> to the ngrok URL. Update the Vapi assistant's serverUrl whenever ngrok URL changes.</div>
+  </div>
+</div>
+
+<div class="ib ib-a"><span class="ico">⚑</span><p><strong>CORS in Express:</strong> <code>cors({ origin: config.frontendUrl, credentials: true })</code> — set <code>FRONTEND_URL=https://yourapp.vercel.app</code> in Railway. For local dev: <code>FRONTEND_URL=http://localhost:3000</code>.</p></div>
+
+<!-- ENV VARS -->
+<div id="env-vars" class="sh">
+  <span class="sh-n">ENV</span>
+  <span class="sh-t">Environment Variables</span>
+  <div class="sh-l"></div>
+</div>
+
+<h3>Backend — voiceforge-api/.env</h3>
+<pre><code>PORT=4000
+NODE_ENV=development
+JWT_SECRET=at-least-32-random-characters
+JWT_EXPIRES_IN=7d
+MONGODB_URI=mongodb+srv://...
+R2_ACCOUNT_ID=abc123def456        <span class="cm"># no https:// prefix — just the account ID</span>
+R2_ACCESS_KEY_ID=...
+R2_SECRET_ACCESS_KEY=...
+R2_BUCKET_NAME=voiceforge-uploads
+VAPI_API_KEY=...
+VAPI_WEBHOOK_SECRET=...           <span class="cm"># set this same value in Vapi dashboard</span>
+ELEVENLABS_API_KEY=...
+OPENAI_API_KEY=...
+PINECONE_API_KEY=...
+PINECONE_INDEX=voiceforge-index
+FRONTEND_URL=http://localhost:3000
+API_PUBLIC_URL=https://xxx.ngrok.io  <span class="cm"># public URL so Vapi can reach your webhook</span></code></pre>
+
+<h3>Frontend — voiceforge-web/.env.local</h3>
+<pre><code>NEXT_PUBLIC_API_URL=http://localhost:4000/api  <span class="cm"># browser → Express (public)</span>
+API_URL=http://localhost:4000                  <span class="cm"># server component → Express (internal)</span>
+NEXTAUTH_SECRET=any-random-secret
+NEXTAUTH_URL=http://localhost:3000</code></pre>
+
+<!-- COSTS -->
+<div id="costs" class="sh">
+  <span class="sh-n">COSTS</span>
+  <span class="sh-t">Cost Model</span>
+  <div class="sh-l"></div>
+  <span class="sh-b sb-rag">KNOW BEFORE YOU SCALE</span>
+</div>
+
+<table>
+  <tr><th>Service</th><th>Cost</th><th>Notes</th></tr>
+  <tr><td>Railway (backend)</td><td>~$5/month</td><td>Always-on Node.js. Free tier cold-starts — pay for Starter to keep it warm.</td></tr>
+  <tr><td>Vercel (frontend)</td><td>$0</td><td>Free tier is fine. Next.js control panel has very light traffic.</td></tr>
+  <tr><td>MongoDB Atlas</td><td>$0 → $9/month</td><td>M0 free tier up to 512MB. Upgrade when you hit the limit.</td></tr>
+  <tr><td>Cloudflare R2</td><td>~$0.015/GB stored</td><td>Zero egress fees — critical since worker downloads files for ingestion.</td></tr>
+  <tr><td>Pinecone</td><td>$0 → $70/month</td><td>Serverless free: 2GB storage. Enough for hundreds of early users.</td></tr>
+  <tr><td>OpenAI (embeddings)</td><td>$0.02/million tokens</td><td>text-embedding-3-small. Essentially free at early scale.</td></tr>
+  <tr><td>OpenAI (GPT-4o)</td><td>~$0.005–0.015/call</td><td>Switch to GPT-4o-mini to cut cost by ~10×.</td></tr>
+  <tr><td>Vapi.ai</td><td>$0.05/minute</td><td>Orchestration fee on top of TTS/STT. The biggest margin pressure.</td></tr>
+  <tr><td>ElevenLabs TTS</td><td>~$0.30/1000 chars</td><td>Largest variable cost per call. Price your credits accordingly.</td></tr>
+  <tr><td>Deepgram STT</td><td>$0.0059/minute</td><td>Very cheap. Vapi handles billing directly with them.</td></tr>
+</table>
+
+<div class="ib ib-r"><span class="ico">⚠</span><p><strong>Cost spiral protection:</strong> Always validate credits ≥ 5 before initiating a call. Add a rate limit on <code>/calls/outbound</code> (max 10 calls/hour per user) to prevent runaway automation or abuse.</p></div>
+
+<!-- PHASES -->
+<div id="phases" class="sh">
+  <span class="sh-n">PHASES</span>
+  <span class="sh-t">Build Phases</span>
+  <div class="sh-l"></div>
+</div>
+
+<h3>Phase 1 — MVP (Build Now)</h3>
+<pre><code>Backend:   Express setup → config → DB models → JWT auth routes
+           → Agents CRUD + Vapi provisioning → R2 + knowledge routes
+           → Voice call routes + webhook handler → RAG pipeline
+           → Credits service → Ingestion worker → Voices proxy
+
+Frontend:  Next.js scaffold → Axios API client + JWT bridge
+           → Auth pages → Dashboard shell + 21st.dev landing hero
+           → Agent wizard (4 steps) → Knowledge uploader + polling
+           → Call initiator + status machine → Billing page (stub payment)
+
+Deploy:    Backend → Railway (always-on) · Frontend → Vercel
+           Local webhook testing: ngrok http 4000</code></pre>
+
+<h3>Phase 2 — Growth</h3>
+<pre><code>- Real Razorpay webhook verification (replace stub in credits.routes.ts)
+- Inbound call handling (Vapi phone number assignment per agent)
+- Firecrawl API (replace Cheerio for JS-rendered SPAs)
+- Scheduled outbound campaigns (cron via node-cron inside Express)
+- Post-call sentiment analysis (GPT-4o-mini on transcript after call ends)
+- Team accounts (multiple users per workspace, shared knowledge namespace)</code></pre>
+
+<h3>Phase 3 — Scale</h3>
+<pre><code>- BullMQ + Redis (replace setInterval worker for higher ingestion throughput)
+- Custom voice cloning (ElevenLabs Voice Lab API)
+- Real-time call monitoring (WebSocket stream of live transcript to frontend)
+- CRM integrations (HubSpot, Salesforce via Zapier or direct API)
+- Analytics dashboard with conversion tracking per agent
+- White-label / custom subdomain support</code></pre>
+
+<hr/>
+<p style="text-align:center;color:var(--dim);font-size:12px;margin-top:24px;font-family:var(--mono)">VoiceForge Platform Docs v2 · Separated Architecture · 2026</p>
+
+</main>
+</div>
+
+<script>
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      document.querySelectorAll('.sl').forEach(l => l.classList.remove('on'));
+      const m = document.querySelector('.sl[href="#' + e.target.id + '"]');
+      if (m) m.classList.add('on');
+    }
+  });
+}, { threshold: 0.2, rootMargin: '-58px 0px -60% 0px' });
+document.querySelectorAll('[id]').forEach(s => { if (s.id) obs.observe(s); });
+</script>
+</body>
+</html>

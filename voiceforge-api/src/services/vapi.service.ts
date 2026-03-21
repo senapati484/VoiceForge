@@ -1,0 +1,160 @@
+import { config } from '../config';
+import { Agent, type IAgent } from '../db';
+import { buildSystemPrompt } from './contextBuilder.service';
+
+const VAPI = 'https://api.vapi.ai';
+
+const hdrs = () => ({
+  'Content-Type': 'application/json',
+  Authorization: `Bearer ${config.vapi.apiKey}`
+});
+
+async function vapiRequest(endpoint: string, options: RequestInit = {}): Promise<unknown> {
+  if (!config.vapi.apiKey) {
+    throw new Error('Vapi API key missing. Set VAPI_API_KEY to your Vapi private/server key.');
+  }
+  const response = await fetch(`${VAPI}${endpoint}`, {
+    ...options,
+    headers: {
+      ...hdrs(),
+      ...options.headers
+    }
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    const keyHint =
+      response.status === 401
+        ? ' Vapi returned 401 Unauthorized. Ensure VAPI_API_KEY is a Vapi private/server key (not public/client key).'
+        : '';
+    throw new Error(`Vapi API error: ${response.status} ${error}${keyHint}`);
+  }
+
+  return response.json();
+}
+
+function getOpeningLine(agent: IAgent): string {
+  const lines: Record<string, string> = {
+    marketing: `Hi! I'm ${agent.name} calling from ${agent.businessName}. Is this a good time?`,
+    support: `Thank you for calling ${agent.businessName}. I'm ${agent.name}, how can I help?`,
+    sales: `Hi, I'm ${agent.name} from ${agent.businessName}. I'm reaching out about our services — do you have a moment?`,
+    tech: `${agent.businessName} tech support, this is ${agent.name}. How can I assist you today?`
+  };
+  return lines[agent.agentType] || lines.marketing;
+}
+
+export async function createVapiAssistant(agent: IAgent): Promise<string> {
+  const systemPrompt = buildSystemPrompt(agent, []);
+  const requestBody = {
+    name: agent.name,
+    voice: {
+      provider: 'vapi',
+      voiceId: agent.voiceId
+    },
+    transcriber: {
+      provider: 'vapi',
+      language: agent.language
+    },
+    model: {
+      provider: 'custom-llm',
+      url: `${config.apiPublicUrl}/api/llm/chat/completions`,
+      model: config.gemini.model,
+      systemPrompt: systemPrompt,
+      temperature: 0.6
+    },
+    serverUrl: `${config.apiPublicUrl}/api/calls/webhook`,
+    firstMessage: getOpeningLine(agent),
+    endCallPhrases: ['goodbye', 'bye', 'hang up', 'end call'],
+    maxDurationSeconds: 600
+  };
+
+  console.log('[Vapi] Creating assistant with config:', JSON.stringify(requestBody, null, 2));
+
+  const assistant = await vapiRequest('/assistant', {
+    method: 'POST',
+    body: JSON.stringify(requestBody)
+  }) as { id: string };
+
+  console.log('[Vapi] Assistant created successfully:', assistant.id);
+  return assistant.id;
+}
+
+export async function updateVapiAssistant(vapiId: string, updates: Partial<IAgent>): Promise<void> {
+  const body: Record<string, unknown> = {};
+
+  if (updates.name) body.name = updates.name;
+  if (updates.voiceId) {
+    body.voice = { provider: 'vapi', voiceId: updates.voiceId };
+  }
+  if (updates.language) {
+    body.transcriber = { provider: 'vapi', language: updates.language };
+  }
+
+  await vapiRequest(`/assistant/${vapiId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body)
+  });
+}
+
+export async function deleteVapiAssistant(vapiId: string): Promise<void> {
+  try {
+    await vapiRequest(`/assistant/${vapiId}`, {
+      method: 'DELETE'
+    });
+  } catch (err) {
+    // Ignore 404 errors (assistant already deleted)
+    if (err instanceof Error && err.message.includes('404')) {
+      return;
+    }
+    throw err;
+  }
+}
+
+export async function triggerOutboundCall(
+  vapiAssistantId: string,
+  toNumber: string,
+  metadata?: Record<string, string>
+): Promise<{ id: string }> {
+  const response = await vapiRequest('/call/phone', {
+    method: 'POST',
+    body: JSON.stringify({
+      assistantId: vapiAssistantId,
+      customer: { number: toNumber },
+      assistantOverrides: metadata ? { metadata } : undefined
+    })
+  }) as { id: string };
+
+  return response;
+}
+
+export async function purchasePhoneNumber(areaCode?: string): Promise<{ id: string; number: string }> {
+  const response = await vapiRequest('/phone-number', {
+    method: 'POST',
+    body: JSON.stringify({
+      provider: 'vapi',
+      areaCode
+    })
+  }) as { id: string; number: string };
+
+  return response;
+}
+
+export async function assignPhoneToAssistant(phoneNumberId: string, assistantId: string): Promise<void> {
+  await vapiRequest(`/phone-number/${phoneNumberId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      assistantId
+    })
+  });
+}
+
+export async function listAvailableVoices(): Promise<Array<{ id: string; name: string; gender: string }>> {
+  return [
+    { id: 'joseph', name: 'Joseph', gender: 'male' },
+    { id: 'jennifer', name: 'Jennifer', gender: 'female' },
+    { id: 'michael', name: 'Michael', gender: 'male' },
+    { id: 'sarah', name: 'Sarah', gender: 'female' },
+    { id: 'alex', name: 'Alex', gender: 'male' },
+    { id: 'emma', name: 'Emma', gender: 'female' }
+  ];
+}
