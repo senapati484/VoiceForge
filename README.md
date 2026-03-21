@@ -97,7 +97,7 @@ voiceforge/
 ### 1. Clone Repository
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/senapati484/VoiceForge.git
 cd voiceforge
 ```
 
