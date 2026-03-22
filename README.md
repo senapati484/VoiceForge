@@ -1,5 +1,4 @@
 # 🎙️ VoiceForge - AI Voice Agent Platform 
-Just give a start⭐️ if you like it ;)
 
 <p align="center">
   <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" />
@@ -23,6 +22,7 @@ VoiceForge is a complete AI Voice Agent platform that enables businesses to crea
 📊 **Campaign Analytics** - Track call status, duration, transcripts
 🔧 **Custom Tools** - AI can execute functions (book appointments, send SMS, etc.)
 💳 **Credit System** - Built-in credit management for usage tracking
+⭐️ **Just Give a Star⭐️** if you like it ;)
 
 ---
 
