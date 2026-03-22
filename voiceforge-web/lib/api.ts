@@ -58,6 +58,15 @@ function normalizeAgent(agent: Agent & { _id?: string }): Agent {
   };
 }
 
+function normalizeCreditTransaction(
+  transaction: CreditTransaction & { _id?: string }
+): CreditTransaction {
+  return {
+    ...transaction,
+    id: transaction.id || transaction._id || ''
+  };
+}
+
 export const agentsApi = {
   list: async (): Promise<Agent[]> => {
     const res = await http.get('/agents');
@@ -153,7 +162,12 @@ export const knowledgeApi = {
 export const creditsApi = {
   get: async (): Promise<{ credits: number; transactions: CreditTransaction[] }> => {
     const res = await http.get('/credits');
-    return res.data;
+    return {
+      ...res.data,
+      transactions: (res.data.transactions as Array<CreditTransaction & { _id?: string }>).map(
+        normalizeCreditTransaction
+      )
+    };
   },
   purchase: async (packId: 'starter' | 'growth' | 'business'): Promise<{ success: boolean; creditsAdded: number; newTotal: number }> => {
     const res = await http.post('/credits/purchase', { packId });
