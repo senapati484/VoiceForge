@@ -61,9 +61,9 @@ export async function createVapiAssistant(agent: IAgent): Promise<string> {
     model: {
       provider: 'custom-llm',
       url: `${config.apiPublicUrl}/api/llm/chat/completions`,
-      model: config.gemini.model,
+      model: config.groq.model || 'llama-3.1-8b-instant',
       systemPrompt: systemPrompt,
-      temperature: 0.6
+      temperature: 0.7
     },
     // Server URL for webhooks - uses the new /vapi/webhook endpoint
     serverUrl: `${config.apiPublicUrl}/vapi/webhook`,
@@ -199,9 +199,9 @@ export async function triggerOutboundCallWithDynamicContext(
       model: {
         provider: 'custom-llm',
         url: `${config.apiPublicUrl}/api/llm/chat/completions`,
-        model: config.gemini.model,
+        model: config.groq.model || 'llama-3.1-8b-instant',
         systemPrompt: systemPrompt,
-        temperature: 0.6
+        temperature: 0.7
       },
       serverUrl: `${config.apiPublicUrl}/vapi/webhook`,
       endCallPhrases: ['goodbye', 'bye', 'hang up', 'end call'],

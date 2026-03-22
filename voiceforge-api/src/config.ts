@@ -20,6 +20,27 @@ function reqAny(keys: string[]): string {
   return value;
 }
 
+function optionalInt(value?: string): number | undefined {
+  if (!value?.trim()) return undefined;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function optionalFloat(value?: string): number | undefined {
+  if (!value?.trim()) return undefined;
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function optionalList(value?: string): string[] | undefined {
+  if (!value?.trim()) return undefined;
+  const items = value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return items.length > 0 ? items : undefined;
+}
+
 function bucketFromS3ApiUrl(url?: string): string | undefined {
   if (!url) return undefined;
   try {
@@ -105,7 +126,15 @@ export const config = {
   // Gemini — for context extraction
   gemini: {
     apiKey: firstEnv(['GEMINI_API_KEY', 'GOOGLE_API_KEY']),
-    model: process.env.GEMINI_MODEL || 'gemini-2.5-flash'
+    model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+    maxRetries: optionalInt(process.env.GEMINI_MAX_RETRIES) ?? 2,
+    maxOutputTokens: optionalInt(process.env.GEMINI_MAX_OUTPUT_TOKENS) ?? 800,
+    contextMaxOutputTokens: optionalInt(process.env.GEMINI_CONTEXT_MAX_OUTPUT_TOKENS) ?? 800,
+    agentContextMaxOutputTokens:
+      optionalInt(process.env.GEMINI_AGENT_CONTEXT_MAX_OUTPUT_TOKENS) ?? 1000,
+    topP: optionalFloat(process.env.GEMINI_TOP_P),
+    topK: optionalInt(process.env.GEMINI_TOP_K),
+    stopSequences: optionalList(process.env.GEMINI_STOP_SEQUENCES)
   },
   // Groq — primary LLM for voice calls (fast, good free tier)
   groq: {

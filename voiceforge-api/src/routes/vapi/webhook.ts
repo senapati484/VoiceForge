@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import { Types } from 'mongoose';
 import { config } from '../../config';
 import { Agent, CallLog, User, CreditLedger, Campaign, CsvContact, UserKnowledgeContext } from '../../db';
-import { buildSystemPrompt, buildPersonaPrompt, buildCompactSystemPrompt, buildCombinedSystemPrompt, type KnowledgeFile } from '../../services/contextBuilder.service';
+import { buildSystemPrompt, buildCombinedSystemPrompt, type KnowledgeFile, clearAgentContextCache } from '../../services/contextBuilder.service';
 import { retrieveText } from '../../services/pinecone.service';
 
 /**
@@ -156,53 +156,36 @@ async function handleAssistantRequest(message: any, res: Response): Promise<void
     }
 
     if (agent) {
-      console.log(`\n✅ [Vapi Webhook] Agent FOUND via ${lookupMethod}: ${agent.name} (${agent.agentType})`);
-      console.log('[Vapi Webhook] Agent Business Name:', agent.businessName);
-      console.log('[Vapi Webhook] Agent Call Objective:', agent.callObjective);
-      console.log('[Vapi Webhook] Agent has knowledgeFile:', !!agent.knowledgeFile);
+      const startTime = Date.now();
+      console.log(`📞 [Vapi Webhook] Agent: ${agent.name} (${agent.agentType}) - ${lookupMethod}`);
 
-        // Fetch user's business context (from knowledge documents)
-        let businessContext: KnowledgeFile | null = null;
-        if (userId) {
-          const userKnowledge = await UserKnowledgeContext.findOne({ userId });
-          if (userKnowledge?.knowledgeFile) {
-            businessContext = userKnowledge.knowledgeFile as unknown as KnowledgeFile;
-            console.log('[Vapi Webhook] ✅ Business context LOADED');
-          } else {
-            console.log('[Vapi Webhook] ⚠️ No business context found for user');
-          }
+      // Fetch user's business context (from knowledge documents)
+      let businessContext: KnowledgeFile | null = null;
+      if (userId) {
+        const userKnowledge = await UserKnowledgeContext.findOne({ userId });
+        if (userKnowledge?.knowledgeFile) {
+          businessContext = userKnowledge.knowledgeFile as unknown as KnowledgeFile;
         }
+      }
 
-        // Build combined system prompt with agent context + business context + contact info
-        console.log('[Vapi Webhook] Building system prompt...');
-        let systemPrompt = buildCombinedSystemPrompt(agent, businessContext);
-        console.log(`[Vapi Webhook] System prompt LENGTH: ${systemPrompt.length} characters`);
-        console.log('[Vapi Webhook] System prompt PREVIEW:');
-        console.log('---');
-        console.log(systemPrompt.slice(0, 1000));
-        console.log('...');
-        console.log('---');
+      // Build optimized system prompt (cached for performance)
+      let systemPrompt = buildCombinedSystemPrompt(agent, businessContext);
 
-        // Add contact-specific context if available
-        let firstMessage = getOpeningLine(agent);
-        if (contactName) {
-          firstMessage = `${firstMessage} Is this ${contactName}?`;
-          systemPrompt += `\n\nCALL CONTEXT:\n• Contact Name: ${contactName}`;
-          if (contactNotes) {
-            systemPrompt += `\n• Previous Notes: ${contactNotes}`;
-          }
-          if (campaignId) {
-            systemPrompt += `\n• This is an outbound campaign call`;
-          }
+      // Add contact-specific context if available
+      let firstMessage = getOpeningLine(agent);
+      if (contactName) {
+        firstMessage = `${firstMessage} Is this ${contactName}?`;
+        systemPrompt += `\n\nCALL CONTEXT:\n• Contact Name: ${contactName}`;
+        if (contactNotes) {
+          systemPrompt += `\n• Notes: ${contactNotes.slice(0, 100)}`;
         }
+        if (campaignId) {
+          systemPrompt += `\n• Campaign call`;
+        }
+      }
 
-        console.log('[Vapi Webhook] Sending assistant config to Vapi...');
-        console.log('[Vapi Webhook] Response includes systemPrompt:', systemPrompt.length > 0);
-        console.log('[Vapi Webhook] Response firstMessage:', firstMessage);
-        console.log('[Vapi Webhook] FULL systemPrompt being sent:');
-        console.log('=== SYSTEM PROMPT START ===');
-        console.log(systemPrompt);
-        console.log('=== SYSTEM PROMPT END ===');
+      const buildTime = Date.now() - startTime;
+      console.log(`[Vapi Webhook] ✅ Config ready in ${buildTime}ms, prompt: ${systemPrompt.length} chars`);
 
         res.json({
           assistant: {
@@ -220,9 +203,9 @@ async function handleAssistantRequest(message: any, res: Response): Promise<void
             model: {
               provider: 'custom-llm',
               url: `${config.apiPublicUrl}/api/llm/chat/completions`,
-              model: config.gemini.model,
+              model: config.groq.model || 'llama-3.1-8b-instant',
               systemPrompt: systemPrompt,
-              temperature: 0.6
+              temperature: 0.7
             },
             serverUrl: `${config.apiPublicUrl}/vapi/webhook`,
             serverUrlSecret: config.vapi.webhookSecret,
@@ -271,9 +254,9 @@ async function handleAssistantRequest(message: any, res: Response): Promise<void
         model: {
           provider: 'custom-llm',
           url: `${config.apiPublicUrl}/api/llm/chat/completions`,
-          model: config.gemini.model,
+          model: config.groq.model || 'llama-3.1-8b-instant',
           systemPrompt: 'You are a helpful voice assistant. Keep responses concise and natural for voice conversation.',
-          temperature: 0.6
+          temperature: 0.7
         },
         serverUrl: `${config.apiPublicUrl}/vapi/webhook`,
         serverUrlSecret: config.vapi.webhookSecret,

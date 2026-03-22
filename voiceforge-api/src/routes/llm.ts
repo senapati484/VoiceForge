@@ -3,50 +3,198 @@ import { config } from '../config';
 
 const router = Router();
 
-// Groq API configuration
+// Groq API configuration - optimized for voice
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL = 'llama-3.1-8b-instant'; // Fast, good for voice
+const GROQ_MODEL = 'llama-3.1-8b-instant'; // Fastest model for voice
 
-// POST /llm/chat/completions - OpenAI-compatible proxy for Vapi custom-llm using Groq
+// Constants for voice optimization
+const MAX_TOKENS = 80; // Reduced for faster responses (keep answers concise)
+const TIMEOUT_MS = 8000; // 8 second timeout for voice
+
+interface ChatMessage {
+  role: string;
+  content: string;
+}
+
+/**
+ * POST /llm/chat/completions - Streaming OpenAI-compatible endpoint for Vapi
+ * Streams response tokens for minimal latency in voice calls
+ */
 router.post('/chat/completions', async (req: Request, res: Response) => {
+  const startTime = Date.now();
+  const requestId = 'llm-' + Date.now();
+
+  // Set headers for SSE streaming
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+
+  try {
+    const { messages, temperature, stream = true } = req.body as {
+      messages?: ChatMessage[];
+      temperature?: number;
+      stream?: boolean;
+    };
+
+    console.log(`\n🤖 [LLM] Request ${requestId} - ${stream ? 'STREAMING' : 'NON-STREAMING'}`);
+
+    if (!messages?.length) {
+      res.status(400).json({ error: 'messages required' });
+      return;
+    }
+
+    if (!config.groq.apiKey) {
+      res.status(500).json({ error: 'GROQ_API_KEY not configured' });
+      return;
+    }
+
+    // Transform messages for Groq (Vapi uses 'bot', we need 'assistant')
+    const groqMessages = messages.map(m => ({
+      role: m.role === 'bot' ? 'assistant' : m.role,
+      content: m.content
+    }));
+
+    console.log(`[LLM] Messages: ${groqMessages.length}, First: ${groqMessages[0]?.content?.slice(0, 50)}...`);
+
+    // Call Groq with streaming enabled
+    const groqResponse = await fetch(GROQ_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.groq.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        messages: groqMessages,
+        temperature: temperature ?? 0.7,
+        max_tokens: MAX_TOKENS,
+        stream: true // Always stream for voice
+      })
+    });
+
+    if (!groqResponse.ok) {
+      const errorData = await groqResponse.text();
+      console.error('[LLM] Groq error:', groqResponse.status, errorData);
+      res.status(500).json({ error: 'LLM service error' });
+      return;
+    }
+
+    // Stream the response to Vapi
+    const reader = groqResponse.body?.getReader();
+    if (!reader) {
+      res.status(500).json({ error: 'No response stream' });
+      return;
+    }
+
+    // Send OpenAI-compatible streaming response
+    res.write(`data: ${JSON.stringify({
+      id: requestId,
+      object: 'chat.completion.chunk',
+      created: Math.floor(Date.now() / 1000),
+      model: GROQ_MODEL,
+      choices: [{ index: 0, delta: { role: 'assistant' }, finish_reason: null }]
+    })}\n\n`);
+
+    let fullContent = '';
+    const decoder = new TextDecoder();
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n').filter(line => line.trim());
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') {
+              // Send final chunk
+              res.write(`data: ${JSON.stringify({
+                id: requestId,
+                object: 'chat.completion.chunk',
+                created: Math.floor(Date.now() / 1000),
+                model: GROQ_MODEL,
+                choices: [{ index: 0, delta: {}, finish_reason: 'stop' }]
+              })}\n\n`);
+              res.write('data: [DONE]\n\n');
+              break;
+            }
+
+            try {
+              const parsed = JSON.parse(data);
+              const content = parsed.choices?.[0]?.delta?.content || '';
+              if (content) {
+                fullContent += content;
+                // Stream to Vapi immediately
+                res.write(`data: ${JSON.stringify({
+                  id: requestId,
+                  object: 'chat.completion.chunk',
+                  created: Math.floor(Date.now() / 1000),
+                  model: GROQ_MODEL,
+                  choices: [{ index: 0, delta: { content }, finish_reason: null }]
+                })}\n\n`);
+              }
+            } catch (e) {
+              // Skip invalid JSON lines
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    const duration = Date.now() - startTime;
+    console.log(`[LLM] ✅ Stream completed in ${duration}ms, ${fullContent.length} chars`);
+    res.end();
+
+  } catch (err: any) {
+    const duration = Date.now() - startTime;
+    console.error(`[LLM] ❌ Error after ${duration}ms:`, err.message);
+
+    // Send error as final chunk
+    res.write(`data: ${JSON.stringify({
+      id: requestId,
+      object: 'chat.completion.chunk',
+      created: Math.floor(Date.now() / 1000),
+      model: GROQ_MODEL,
+      choices: [{ index: 0, delta: { content: 'I apologize, but I encountered an error.' }, finish_reason: 'stop' }]
+    })}\n\n`);
+    res.write('data: [DONE]\n\n');
+    res.end();
+  }
+});
+
+/**
+ * Non-streaming fallback endpoint for testing
+ */
+router.post('/chat/completions/sync', async (req: Request, res: Response) => {
   const startTime = Date.now();
   const requestId = 'llm-' + Date.now();
 
   try {
     const { messages, temperature } = req.body as {
-      messages?: Array<{ role: string; content: string }>;
+      messages?: ChatMessage[];
       temperature?: number;
     };
 
-    console.log('\n🤖 [LLM] ===========================================');
-    console.log('[LLM] REQUEST RECEIVED - ID:', requestId);
-    console.log('[LLM] Timestamp:', new Date().toISOString());
-    console.log('[LLM] Using provider: Groq');
-    console.log('[LLM] Model:', GROQ_MODEL);
-
-    // Validate messages
     if (!messages?.length) {
-      console.error('[LLM] ERROR: No messages provided');
       res.status(400).json({ error: 'messages required' });
       return;
     }
 
-    // Validate Groq API key
     if (!config.groq.apiKey) {
-      console.error('[LLM] ERROR: GROQ_API_KEY not configured');
-      res.status(500).json({ error: 'LLM service not configured - add GROQ_API_KEY to .env' });
+      res.status(500).json({ error: 'GROQ_API_KEY not configured' });
       return;
     }
 
-    console.log('[LLM] Messages received:', messages.length);
-    messages.forEach((m, i) => {
-      const contentPreview = typeof m.content === 'string'
-        ? m.content.slice(0, 100) + (m.content.length > 100 ? '...' : '')
-        : 'INVALID CONTENT TYPE';
-      console.log(`[LLM]   [${i}] ${m.role}: ${contentPreview}`);
-    });
-
-    console.log('[LLM] Calling Groq API...');
+    const groqMessages = messages.map(m => ({
+      role: m.role === 'bot' ? 'assistant' : m.role,
+      content: m.content
+    }));
 
     const groqResponse = await fetch(GROQ_API_URL, {
       method: 'POST',
@@ -56,85 +204,42 @@ router.post('/chat/completions', async (req: Request, res: Response) => {
       },
       body: JSON.stringify({
         model: GROQ_MODEL,
-        messages: messages.map(m => ({
-          role: m.role === 'bot' ? 'assistant' : m.role,
-          content: m.content
-        })),
-        temperature: temperature ?? 0.6,
-        max_tokens: 150
+        messages: groqMessages,
+        temperature: temperature ?? 0.7,
+        max_tokens: MAX_TOKENS,
+        stream: false
       })
     });
 
     if (!groqResponse.ok) {
-      const errorData = await groqResponse.json().catch(() => null);
-      console.error('[LLM] Groq API error:', groqResponse.status, errorData);
-      throw new Error(`Groq API error: ${groqResponse.status} ${errorData?.error?.message || groqResponse.statusText}`);
+      const errorData = await groqResponse.text();
+      console.error('[LLM] Groq error:', groqResponse.status, errorData);
+      res.status(500).json({ error: 'LLM service error' });
+      return;
     }
 
     const groqData = await groqResponse.json();
     const content = groqData.choices?.[0]?.message?.content || '';
 
-    console.log('[LLM] Groq response received');
-    console.log('[LLM] Response length:', content.length);
-    console.log('[LLM] Response content:', content);
-
-    if (!content || content.trim().length === 0) {
-      console.error('[LLM] WARNING: Empty response from Groq!');
-    }
-
     const duration = Date.now() - startTime;
-    console.log(`[LLM] Request completed in ${duration}ms`);
-    console.log('[LLM] ===========================================\n');
+    console.log(`[LLM] ✅ Sync response in ${duration}ms`);
 
-    // Return OpenAI-compatible format
     res.json({
       id: requestId,
       object: 'chat.completion',
       created: Math.floor(Date.now() / 1000),
       model: GROQ_MODEL,
-      choices: [
-        {
-          index: 0,
-          message: {
-            role: 'assistant',
-            content: content || 'I apologize, but I am unable to respond at this moment.'
-          },
-          finish_reason: 'stop'
-        }
-      ],
-      usage: groqData.usage || {
-        prompt_tokens: messages.reduce((acc, m) => acc + (m.content?.length || 0), 0),
-        completion_tokens: content?.length || 0,
-        total_tokens: messages.reduce((acc, m) => acc + (m.content?.length || 0), 0) + (content?.length || 0)
-      }
+      choices: [{
+        index: 0,
+        message: { role: 'assistant', content },
+        finish_reason: 'stop'
+      }],
+      usage: groqData.usage
     });
 
   } catch (err: any) {
-    const duration = Date.now() - startTime;
-    console.error('\n🤖 [LLM] ===========================================');
-    console.error('[LLM] FATAL ERROR - Request ID:', requestId);
-    console.error('[LLM] Error after', duration, 'ms');
-    console.error('[LLM] Error:', err?.message);
-    console.error('[LLM] ===========================================\n');
-
-    // Return fallback
-    res.status(200).json({
-      id: requestId,
-      object: 'chat.completion',
-      created: Math.floor(Date.now() / 1000),
-      model: GROQ_MODEL,
-      choices: [
-        {
-          index: 0,
-          message: {
-            role: 'assistant',
-            content: 'I apologize, but I encountered an error. Please try again.'
-          },
-          finish_reason: 'stop'
-        }
-      ],
-      error: { message: err?.message }
-    });
+    console.error('[LLM] Error:', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -144,6 +249,7 @@ router.get('/health', (_req, res) => {
     status: 'ok',
     provider: 'groq',
     model: GROQ_MODEL,
+    streaming: true,
     hasApiKey: !!config.groq.apiKey
   });
 });
