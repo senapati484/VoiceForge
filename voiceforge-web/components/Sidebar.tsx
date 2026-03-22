@@ -58,7 +58,10 @@ function SidebarContent() {
 
       <nav className="flex-1 space-y-1 p-3" aria-label="Dashboard navigation">
         {navItems.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const active =
+            item.href === "/dashboard"
+              ? pathname === item.href
+              : pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
             <Link
               key={item.href}

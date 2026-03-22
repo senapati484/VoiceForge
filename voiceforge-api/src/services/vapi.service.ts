@@ -1,6 +1,6 @@
 import { config } from '../config';
-import { Agent, type IAgent } from '../db';
-import { buildSystemPrompt } from './contextBuilder.service';
+import { Agent, type IAgent, UserKnowledgeContext } from '../db';
+import { buildSystemPrompt, buildCombinedSystemPrompt, type KnowledgeFile } from './contextBuilder.service';
 
 const VAPI = 'https://api.vapi.ai';
 
@@ -47,21 +47,16 @@ export async function createVapiAssistant(agent: IAgent): Promise<string> {
   const systemPrompt = buildSystemPrompt(agent, []);
   const requestBody = {
     name: agent.name,
-    // Primary voice provider with fallback
+    // Voice config - vapi voices don't support fallback
     voice: {
       provider: 'vapi',
-      voiceId: agent.voiceId,
-      // Fallback to OpenAI voice if vapi voice fails
-      fallbackProvider: 'openai',
-      fallbackVoiceId: 'alloy' // OpenAI's default voice
+      voiceId: agent.voiceId
     },
-    // Primary transcriber with fallback
+    // Transcriber - use deepgram (vapi is not a valid provider)
     transcriber: {
-      provider: 'vapi',
-      language: agent.language,
-      // Fallback to Deepgram if vapi transcriber fails
-      fallbackProvider: 'deepgram',
-      fallbackModel: 'nova-2' // Deepgram's best model
+      provider: 'deepgram',
+      model: 'nova-2',
+      language: agent.language || 'en'
     },
     model: {
       provider: 'custom-llm',
@@ -72,6 +67,7 @@ export async function createVapiAssistant(agent: IAgent): Promise<string> {
     },
     // Server URL for webhooks - uses the new /vapi/webhook endpoint
     serverUrl: `${config.apiPublicUrl}/vapi/webhook`,
+    serverUrlSecret: config.vapi.webhookSecret,
     firstMessage: getOpeningLine(agent),
     endCallPhrases: ['goodbye', 'bye', 'hang up', 'end call'],
     maxDurationSeconds: 600
@@ -95,17 +91,14 @@ export async function updateVapiAssistant(vapiId: string, updates: Partial<IAgen
   if (updates.voiceId) {
     body.voice = {
       provider: 'vapi',
-      voiceId: updates.voiceId,
-      fallbackProvider: 'openai',
-      fallbackVoiceId: 'alloy'
+      voiceId: updates.voiceId
     };
   }
   if (updates.language) {
     body.transcriber = {
-      provider: 'vapi',
-      language: updates.language,
-      fallbackProvider: 'deepgram',
-      fallbackModel: 'nova-2'
+      provider: 'deepgram',
+      model: 'nova-2',
+      language: updates.language || 'en'
     };
   }
 
@@ -138,7 +131,8 @@ export async function triggerOutboundCall(
   const body: any = {
     assistantId: vapiAssistantId,
     customer: { number: toNumber },
-    assistantOverrides: metadata ? { metadata } : undefined
+    // Pass metadata at top level (not inside assistantOverrides)
+    metadata: metadata || undefined
   };
 
   // Only add phoneNumberId if provided (for domestic calls with paid numbers)
@@ -160,6 +154,81 @@ export async function triggerOutboundCall(
 
   console.log('[Vapi] Call initiated:', response.id);
   return response;
+}
+
+/**
+ * Trigger outbound call with DYNAMIC context (forces webhook usage)
+ * This passes full assistant configuration instead of just assistantId
+ * Forces Vapi to call our webhook for fresh context on every call
+ */
+export async function triggerOutboundCallWithDynamicContext(
+  agent: IAgent,
+  toNumber: string,
+  metadata?: Record<string, string>,
+  phoneNumberId?: string
+): Promise<{ id: string }> {
+  // Load user's business context
+  const userContext = await UserKnowledgeContext.findOne({ userId: agent.userId });
+
+  // Build combined system prompt with agent + business context
+  const knowledgeFile = userContext?.knowledgeFile
+    ? (userContext.knowledgeFile as unknown as KnowledgeFile)
+    : undefined;
+  const systemPrompt = buildCombinedSystemPrompt(agent, knowledgeFile);
+
+  // Build first message based on agent and contact info
+  const contactName = metadata?.contactName;
+  const firstMessage = contactName
+    ? `Hi! I'm ${agent.name} calling from ${agent.businessName}. Is this ${contactName}?`
+    : getOpeningLine(agent);
+
+  // Call Vapi with FULL assistant config (no assistantId - this forces webhook)
+  const body: any = {
+    assistant: {
+      name: agent.name,
+      firstMessage: firstMessage,
+      voice: {
+        provider: 'vapi',
+        voiceId: agent.voiceId || 'Elliot'
+      },
+      transcriber: {
+        provider: 'deepgram',
+        model: 'nova-2',
+        language: agent.language || 'en'
+      },
+      model: {
+        provider: 'custom-llm',
+        url: `${config.apiPublicUrl}/api/llm/chat/completions`,
+        model: config.gemini.model,
+        systemPrompt: systemPrompt,
+        temperature: 0.6
+      },
+      serverUrl: `${config.apiPublicUrl}/vapi/webhook`,
+      endCallPhrases: ['goodbye', 'bye', 'hang up', 'end call'],
+      maxDurationSeconds: 600
+    },
+    customer: { number: toNumber },
+    // Pass metadata at top level for tracking
+    metadata: metadata || undefined
+  };
+
+  // Only add phoneNumberId for domestic calls (optional)
+  if (phoneNumberId) {
+    body.phoneNumberId = phoneNumberId;
+  }
+
+  console.log('[Vapi] Making call with DYNAMIC context:', {
+    to: toNumber,
+    agentName: agent.name,
+    businessName: agent.businessName,
+    systemPromptLength: systemPrompt.length,
+    hasBusinessContext: !!userContext?.knowledgeFile
+  });
+
+  return vapiRequest('/call/phone', {
+    method: 'POST',
+    body: JSON.stringify(body)
+  }) as Promise<{ id: string }>;
 }
 
 export async function purchasePhoneNumber(areaCode?: string): Promise<{ id: string; number: string }> {

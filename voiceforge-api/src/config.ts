@@ -102,10 +102,15 @@ export const config = {
     baseUrl: 'https://api.smolify.com/v1',
     model: process.env.SMOLIFY_MODEL || 'meta-llama/Meta-Llama-3.1-70B-Instruct'
   },
-  // Gemini — primary LLM for context extraction and Vapi custom-llm proxy
+  // Gemini — for context extraction
   gemini: {
     apiKey: firstEnv(['GEMINI_API_KEY', 'GOOGLE_API_KEY']),
     model: process.env.GEMINI_MODEL || 'gemini-2.5-flash'
+  },
+  // Groq — primary LLM for voice calls (fast, good free tier)
+  groq: {
+    apiKey: firstEnv(['GROQ_API_KEY']),
+    model: process.env.GROQ_MODEL || 'llama-3.1-70b-versatile'
   },
   context: {
     provider: (process.env.CONTEXT_PROVIDER || 'gemini') as 'hf' | 'gemini'

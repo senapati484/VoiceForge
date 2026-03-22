@@ -2,7 +2,7 @@ import { parse } from 'csv-parse/sync';
 import { Campaign, CsvContact, Agent, User, CallLog } from '../db';
 import type { ICampaign } from '../db/models/Campaign';
 import { uploadToR2 } from './r2.service';
-import { triggerOutboundCall } from './vapi.service';
+import { triggerOutboundCallWithDynamicContext } from './vapi.service';
 
 interface CsvRow {
   name: string;
@@ -300,8 +300,11 @@ export async function runCampaign(campaignId: string): Promise<void> {
 
       console.log(`[Campaign] Calling ${contact.phone} (${isInternational ? 'international' : 'domestic'})...`);
 
-      const vapiRes = await triggerOutboundCall(
-        agent.vapiAgentId,
+      // Use triggerOutboundCallWithDynamicContext to FORCE webhook usage
+      // This passes full assistant config instead of just assistantId
+      // Vapi MUST call our webhook to get dynamic context (agent name, business context, etc.)
+      const vapiRes = await triggerOutboundCallWithDynamicContext(
+        agent,
         contact.phone,
         metadata,
         // Don't pass phoneNumberId for international calls

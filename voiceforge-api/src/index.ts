@@ -38,8 +38,22 @@ app.use(morgan('dev'));
 // 4. RAW body parser for Vapi webhooks ONLY — MUST be before express.json()
 // Legacy webhook endpoint (backward compatibility)
 app.use('/api/calls/webhook', express.raw({ type: 'application/json' }), webhookHandler);
-// New Vapi webhook endpoint with full event support
-app.use('/vapi/webhook', express.json({ limit: '10mb' }), vapiWebhookHandler);
+
+// Webhook test endpoint - simple ping to verify accessibility (MUST be before the POST handler)
+app.get('/vapi/webhook', (_req, res) => {
+  res.json({
+    status: 'ok',
+    message: 'Webhook endpoint is accessible',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      POST: '/vapi/webhook - Main webhook handler',
+      GET: '/vapi/webhook - This test endpoint'
+    }
+  });
+});
+
+// New Vapi webhook endpoint with full event support (POST only)
+app.post('/vapi/webhook', express.json({ limit: '10mb' }), vapiWebhookHandler);
 
 // 5. JSON body parser
 app.use(express.json({ limit: '10mb' }));
@@ -72,6 +86,18 @@ app.use(errorHandler);
 
 async function main(): Promise<void> {
   await connectDB();
+
+  // Startup configuration logging
+  console.log('\n═══════════════════════════════════════════════════');
+  console.log('🚀 VoiceForge API Starting...');
+  console.log('═══════════════════════════════════════════════════');
+  console.log('📡 API_PUBLIC_URL:', config.apiPublicUrl);
+  console.log('🔗 Webhook URL:', `${config.apiPublicUrl}/vapi/webhook`);
+  console.log('🤖 LLM Endpoint:', `${config.apiPublicUrl}/api/llm/chat/completions`);
+  console.log('🔑 Vapi API Key:', config.vapi.apiKey ? '✅ Set' : '❌ Missing');
+  console.log('🌐 Frontend URL:', config.frontendUrl);
+  console.log('═══════════════════════════════════════════════════\n');
+
   app.listen(config.port, () => {
     console.log(`⚡ API on port ${config.port}`);
   });

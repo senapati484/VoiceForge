@@ -70,9 +70,12 @@ export async function webhookHandler(req: Request, res: Response): Promise<void>
           return;
         }
 
-        // Calculate duration and credits
+        // Get call direction and calculate credits
+        const existingLog = await CallLog.findOne({ vapiCallId });
+        const direction = existingLog?.direction || 'outbound';
         const durationSec = Math.floor((endedAt.getTime() - startedAt.getTime()) / 1000);
-        const credits = Math.ceil(durationSec / 60) * 3; // 3 credits per minute
+        const costPerMin = direction === 'inbound' ? 2 : 3;
+        const credits = Math.ceil(durationSec / 60) * costPerMin;
 
         // Update call log
         const log = await CallLog.findOneAndUpdate(
@@ -97,7 +100,7 @@ export async function webhookHandler(req: Request, res: Response): Promise<void>
             userId: log.userId,
             type: 'deduct',
             amount: -credits,
-            description: `Call ${durationSec}s`,
+            description: `${direction} call ${durationSec}s (${costPerMin}/min)`,
             callLogId: log._id
           });
 

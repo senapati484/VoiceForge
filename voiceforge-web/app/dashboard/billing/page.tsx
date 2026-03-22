@@ -130,7 +130,7 @@ export default function BillingPage() {
             </TableHeader>
             <TableBody>
               {transactions.length === 0 ? (
-                <TableRow>
+                <TableRow key="empty">
                   <TableCell colSpan={4} className="text-center text-slate-500">
                     No transactions yet.
                   </TableCell>

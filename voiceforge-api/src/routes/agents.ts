@@ -200,4 +200,98 @@ router.get('/:id/regenerate-context', async (req, res, next) => {
   }
 });
 
+// GET /agents/:id/test-context - Test what context would be sent to Vapi
+router.get('/:id/test-context', async (req, res, next) => {
+  try {
+    const userId = req.user!.userId;
+    const { id: agentId } = req.params;
+
+    const agent = await Agent.findById(agentId);
+    if (!agent) {
+      throw new AppError('Agent not found', 404);
+    }
+    if (agent.userId.toString() !== userId) {
+      throw new AppError('Forbidden', 403);
+    }
+
+    // Load business context
+    const userContext = await UserKnowledgeContext.findOne({ userId });
+
+    // Build system prompt
+    const { buildCombinedSystemPrompt } = await import('../services/contextBuilder.service');
+    const systemPrompt = buildCombinedSystemPrompt(
+      agent,
+      userContext?.knowledgeFile as any
+    );
+
+    res.json({
+      agent: {
+        id: agent._id,
+        name: agent.name,
+        businessName: agent.businessName,
+        agentType: agent.agentType,
+        callObjective: agent.callObjective,
+        voiceId: agent.voiceId,
+        language: agent.language,
+        vapiAgentId: agent.vapiAgentId
+      },
+      hasAgentKnowledgeFile: !!agent.knowledgeFile,
+      hasBusinessContext: !!userContext?.knowledgeFile,
+      systemPrompt: {
+        length: systemPrompt.length,
+        preview: systemPrompt.slice(0, 2000),
+        full: systemPrompt
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /agents/:id/vapi-config - Check Vapi assistant configuration
+router.get('/:id/vapi-config', async (req, res, next) => {
+  try {
+    const userId = req.user!.userId;
+    const { id: agentId } = req.params;
+
+    const agent = await Agent.findById(agentId);
+    if (!agent) {
+      throw new AppError('Agent not found', 404);
+    }
+    if (agent.userId.toString() !== userId) {
+      throw new AppError('Forbidden', 403);
+    }
+
+    if (!agent.vapiAgentId) {
+      return res.json({ error: 'No vapiAgentId set for this agent' });
+    }
+
+    // Fetch assistant config from Vapi
+    const response = await fetch(`https://api.vapi.ai/assistant/${agent.vapiAgentId}`, {
+      headers: { Authorization: `Bearer ${process.env.VAPI_API_KEY}` }
+    });
+
+    if (!response.ok) {
+      return res.json({ error: `Failed to fetch from Vapi: ${response.status}` });
+    }
+
+    const vapiConfig = await response.json() as any;
+    res.json({
+      agentId: agent._id,
+      vapiAgentId: agent.vapiAgentId,
+      vapiConfig: {
+        name: vapiConfig.name,
+        serverUrl: vapiConfig.serverUrl,
+        isServerUrlSecretSet: vapiConfig.isServerUrlSecretSet,
+        firstMessage: vapiConfig.firstMessage,
+        voice: vapiConfig.voice,
+        model: vapiConfig.model,
+        transcriber: vapiConfig.transcriber
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

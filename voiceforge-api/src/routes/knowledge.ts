@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 import { scrapeUrlSchema, generateContextSchema } from '../validators/knowledge.validator';
 import { KnowledgeDoc, User, CreditLedger, UserKnowledgeContext } from '../db';
+import { COSTS } from '../services/credits.service';
 import { uploadToR2, r2DocKey, r2ScrapeKey, deleteFromR2 } from '../services/r2.service';
 import { scrapeUrl } from '../services/scraper.service';
 import { AppError } from '../middleware/errorHandler';
@@ -58,8 +59,8 @@ router.post('/upload', upload.single('file'), async (req, res, next) => {
     if (!user) {
       throw new AppError('User not found', 404);
     }
-    if (user.credits < 5) {
-      throw new AppError('Insufficient credits (5 required)', 402);
+    if (user.credits < COSTS.DOC) {
+      throw new AppError(`Insufficient credits (${COSTS.DOC} required)`, 402);
     }
 
     // Determine type from filename
@@ -90,11 +91,11 @@ router.post('/upload', upload.single('file'), async (req, res, next) => {
     });
 
     // Deduct credits
-    await User.findByIdAndUpdate(userId, { $inc: { credits: -5 } });
+    await User.findByIdAndUpdate(userId, { $inc: { credits: -COSTS.DOC } });
     await CreditLedger.create({
       userId,
       type: 'deduct',
-      amount: -5,
+      amount: -COSTS.DOC,
       description: `Document upload: ${filename}`
     });
 
@@ -116,8 +117,8 @@ router.post('/scrape', validate(scrapeUrlSchema), async (req, res, next) => {
 
     // Check credits
     const user = await User.findById(userId);
-    if (!user || user.credits < 2) {
-      throw new AppError('Insufficient credits (2 required)', 402);
+    if (!user || user.credits < COSTS.SCRAPE) {
+      throw new AppError(`Insufficient credits (${COSTS.SCRAPE} required)`, 402);
     }
 
     // Scrape URL
@@ -139,11 +140,11 @@ router.post('/scrape', validate(scrapeUrlSchema), async (req, res, next) => {
     });
 
     // Deduct credits
-    await User.findByIdAndUpdate(userId, { $inc: { credits: -2 } });
+    await User.findByIdAndUpdate(userId, { $inc: { credits: -COSTS.SCRAPE } });
     await CreditLedger.create({
       userId,
       type: 'deduct',
-      amount: -2,
+      amount: -COSTS.SCRAPE,
       description: `Web scrape: ${url.slice(0, 50)}...`
     });
 
@@ -213,6 +214,12 @@ router.post('/generate-context', validate(generateContextSchema), async (req, re
   try {
     const userId = (req.user as JwtPayload).userId;
 
+    // Check credits (3 required for context generation)
+    const user = await User.findById(userId);
+    if (!user || user.credits < COSTS.CONTEXT) {
+      throw new AppError(`Insufficient credits (${COSTS.CONTEXT} required)`, 402);
+    }
+
     const { buildKnowledgeFile } = await import('../services/contextBuilder.service');
     const knowledgeFile = await buildKnowledgeFile(userId);
 
@@ -221,6 +228,15 @@ router.post('/generate-context', validate(generateContextSchema), async (req, re
       { knowledgeFile, generatedAt: new Date() },
       { upsert: true, new: true }
     );
+
+    // Deduct credits for context generation
+    await User.findByIdAndUpdate(userId, { $inc: { credits: -COSTS.CONTEXT } });
+    await CreditLedger.create({
+      userId,
+      type: 'deduct',
+      amount: -COSTS.CONTEXT,
+      description: 'Generate knowledge context'
+    });
 
     res.json({
       success: true,

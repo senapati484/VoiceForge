@@ -3,8 +3,9 @@ import { User, CreditLedger } from '../db';
 export const COSTS = {
   OUTBOUND_PER_MIN: 3,
   INBOUND_PER_MIN: 2,
-  DOC: 5,
-  SCRAPE: 2
+  DOC: 2,
+  SCRAPE: 2,
+  CONTEXT: 3
 } as const;
 
 export async function deductCredits(

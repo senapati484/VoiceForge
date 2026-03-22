@@ -115,6 +115,82 @@ Return this exact JSON structure:
   };
 }
 
+/**
+ * Enhanced prompt builder that generates richer agent contexts with
+ * detailed persona, talking points, objection handling, and call flow
+ */
+function buildEnhancedAgentContextPrompt(input: {
+  agentType: string;
+  description: string;
+  callObjective: string;
+  userContext?: KnowledgeFile;
+}): { system: string; user: string } {
+  const contextJson = input.userContext ? JSON.stringify(input.userContext, null, 2).slice(0, 6000) : '';
+
+  const systemPrompt = `You are an expert AI agent designer specializing in voice calling agents.
+Analyze the user's description and generate a comprehensive agent context.
+The context should be detailed enough for an AI to conduct professional calls.
+
+Key requirements:
+1. Analyze the description deeply - extract implied products, services, and capabilities
+2. Generate realistic Q&A based on the agent type and description
+3. Include specific objection handling responses
+4. Define clear escalation triggers
+5. Reference the user's business context where relevant
+
+Return ONLY valid JSON - no markdown, no explanation.`;
+
+  const userPrompt = `AGENT TYPE: ${input.agentType}
+
+AGENT DESCRIPTION:
+${input.description}
+
+CALL OBJECTIVE:
+${input.callObjective}
+
+${contextJson ? `BUSINESS CONTEXT (merge this information where relevant):
+${contextJson}
+
+` : ''}Generate a comprehensive agent context with this structure:
+
+{
+  "businessSummary": "Detailed 3-4 sentence summary of what this agent handles, including the business value proposition",
+  "keyProducts": [
+    {
+      "name": "Product/Service name",
+      "price": "Price range or tier if mentioned",
+      "description": "Clear description of what it is and who needs it",
+      "features": ["key feature 1", "key feature 2", "benefit to customer"]
+    }
+  ],
+  "commonQA": [
+    {
+      "question": "Common question a caller might ask",
+      "answer": "Professional, helpful answer (2-3 sentences max)"
+    }
+  ],
+  "importantFacts": [
+    "Operating hours or availability",
+    "Typical response time or process",
+    "Any guarantees or policies",
+    "Contact method preferences"
+  ],
+  "escalationTriggers": [
+    "When to transfer to human",
+    "Complaint indicators",
+    "Complex issue signals"
+  ]
+}
+
+Important:
+- Generate at least 5-8 common Q&A pairs based on the agent type and description
+- Include realistic objections and responses
+- If the business context mentions products/pricing, reference them
+- Make the tone professional but conversational for phone calls`;
+
+  return { system: systemPrompt, user: userPrompt };
+}
+
 async function generateWithGemini(docsText: string): Promise<KnowledgeFile> {
   const prompt = buildContextPrompt(docsText);
   const response = await getGeminiClient().invoke([
@@ -247,7 +323,8 @@ export async function buildAgentKnowledgeFile(input: {
     return emptyKnowledgeFile();
   }
 
-  const prompt = buildAgentContextPrompt(input);
+  // Use enhanced prompt that generates richer context
+  const prompt = buildEnhancedAgentContextPrompt(input);
   try {
     const response = await getGeminiClient().invoke([
       new SystemMessage(prompt.system),
@@ -360,4 +437,146 @@ RULES:
 • Tone: ${agent.tone}. Language: ${agent.language}
 • If you don't know: "I don't have that information right now. I can connect you with our team for details."
 • Never invent prices, policies, or facts not in your knowledge`;
+}
+
+/**
+ * Build a compact system prompt optimized for Vapi webhook calls
+ * Includes essential business context without exceeding size limits
+ */
+export function buildCompactSystemPrompt(agent: IAgent): string {
+  // Extract key info from knowledge file if available
+  let businessSummary = '';
+  let keyProducts: string[] = [];
+  let commonQA: string[] = [];
+  let importantFacts: string[] = [];
+
+  if (agent.knowledgeFile && typeof agent.knowledgeFile === 'object') {
+    const kf = agent.knowledgeFile as KnowledgeFile;
+    businessSummary = kf.businessSummary || '';
+
+    if (kf.keyProducts?.length) {
+      keyProducts = kf.keyProducts.slice(0, 5).map(p =>
+        `• ${p.name}${p.price ? ` (${p.price})` : ''}: ${p.description}`
+      );
+    }
+
+    if (kf.commonQA?.length) {
+      commonQA = kf.commonQA.slice(0, 5).map(qa =>
+        `Q: ${qa.question}\nA: ${qa.answer}`
+      );
+    }
+
+    if (kf.importantFacts?.length) {
+      importantFacts = kf.importantFacts.slice(0, 5);
+    }
+  }
+
+  const guidelines = roleGuidelines[agent.agentType] || { do: [], dont: [] };
+
+  return `You are ${agent.name}, a ${agent.agentType} agent for ${agent.businessName}.
+
+CALL OBJECTIVE: ${agent.callObjective}
+
+${businessSummary ? `BUSINESS SUMMARY:\n${businessSummary}\n` : ''}
+
+ROLE GUIDELINES:
+Do:
+${guidelines.do.slice(0, 4).map(g => `• ${g}`).join('\n')}
+
+Don't:
+${guidelines.dont.slice(0, 3).map(g => `• ${g}`).join('\n')}
+
+${keyProducts.length ? `PRODUCTS/SERVICES:\n${keyProducts.join('\n')}\n` : ''}
+
+${commonQA.length ? `COMMON Q\&A:\n${commonQA.join('\n---\n')}\n` : ''}
+
+${importantFacts.length ? `IMPORTANT FACTS:\n${importantFacts.map(f => `• ${f}`).join('\n')}` : ''}
+
+RULES:
+• Keep answers to 1-3 sentences for phone calls
+• Tone: ${agent.tone}. Language: ${agent.language}
+• If unsure: "I don't have that information. Let me connect you with our team."
+• Never invent facts not provided above`;
+}
+
+/**
+ * Build a combined system prompt with AGENT CONTEXT + BUSINESS CONTEXT
+ * This provides comprehensive context for customer support calls
+ */
+export function buildCombinedSystemPrompt(
+  agent: IAgent,
+  businessContext?: KnowledgeFile | null
+): string {
+  // Extract agent's context from knowledgeFile
+  let agentContext = agent.knowledgeFile as KnowledgeFile | undefined;
+
+  // Build agent-specific section
+  let agentSection = '';
+  if (agentContext) {
+    const ac = agentContext;
+    const products = ac.keyProducts?.slice(0, 5).map(p =>
+      `• ${p.name}${p.price ? ` (${p.price})` : ''}: ${p.description}`
+    ).join('\n') || '';
+
+    const qa = ac.commonQA?.slice(0, 6).map(qa =>
+      `Q: ${qa.question}\nA: ${qa.answer}`
+    ).join('\n---\n') || '';
+
+    const facts = ac.importantFacts?.slice(0, 5).map(f => `• ${f}`).join('\n') || '';
+
+    agentSection = `=== AGENT CONTEXT ===
+${ac.businessSummary ? `Purpose: ${ac.businessSummary}\n` : ''}
+${products ? `Agent Products/Services:\n${products}\n` : ''}
+${qa ? `Agent Q\&A:\n${qa}\n` : ''}
+${facts ? `Agent Facts:\n${facts}\n` : ''}
+${ac.escalationTriggers?.length ? `Escalate if: ${ac.escalationTriggers.slice(0, 3).join(', ')}` : ''}`;
+  }
+
+  // Build business context section
+  let businessSection = '';
+  if (businessContext) {
+    const bc = businessContext;
+    const bcProducts = bc.keyProducts?.slice(0, 5).map(p =>
+      `• ${p.name}${p.price ? ` (${p.price})` : ''}: ${p.description}`
+    ).join('\n') || '';
+
+    const bcQA = bc.commonQA?.slice(0, 5).map(qa =>
+      `Q: ${qa.question}\nA: ${qa.answer}`
+    ).join('\n---\n') || '';
+
+    const bcFacts = bc.importantFacts?.slice(0, 6).map(f => `• ${f}`).join('\n') || '';
+
+    businessSection = `=== BUSINESS CONTEXT ===
+${bc.businessSummary ? `About: ${bc.businessSummary}\n` : ''}
+${bcProducts ? `Company Offerings:\n${bcProducts}\n` : ''}
+${bcQA ? `General Q\&A:\n${bcQA}\n` : ''}
+${bcFacts ? `Company Facts:\n${bcFacts}\n` : ''}
+${bc.escalationTriggers?.length ? `Company Escalations: ${bc.escalationTriggers.slice(0, 3).join(', ')}` : ''}`;
+  }
+
+  // Get role guidelines
+  const guidelines = roleGuidelines[agent.agentType] || { do: [], dont: [] };
+
+  // Combine everything
+  return `You are ${agent.name}, a ${agent.agentType} agent for ${agent.businessName}.
+
+CALL OBJECTIVE: ${agent.callObjective}
+
+${agentSection}
+
+${businessSection}
+
+ROLE GUIDELINES:
+Do:
+${guidelines.do.slice(0, 4).map(g => `• ${g}`).join('\n')}
+
+Don't:
+${guidelines.dont.slice(0, 3).map(g => `• ${g}`).join('\n')}
+
+INSTRUCTIONS:
+• Phone conversation - keep responses to 1-3 sentences
+• Tone: ${agent.tone}. Language: ${agent.language}
+• Use agent context for specific tasks, business context for general knowledge
+• If caller asks something outside both contexts: "I don't have that information, but I can connect you with our team."
+• Never invent prices, policies, or facts not in your context`;
 }
