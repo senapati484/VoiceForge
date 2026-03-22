@@ -1,4 +1,5 @@
-# 🎙️ VoiceForge - AI Voice Agent Platform
+# 🎙️ VoiceForge - AI Voice Agent Platform 
+Just give a start⭐️ if you like it ;)
 
 <p align="center">
   <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" />
@@ -7,8 +8,6 @@
   <img src="https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white" />
   <img src="https://img.shields.io/badge/Vapi-5D3FD3?style=for-the-badge" />
 </p>
-
-Just give a start⭐️ if you like it ;)
 
 ## 🌟 Overview 
 
