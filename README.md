@@ -8,7 +8,9 @@
   <img src="https://img.shields.io/badge/Vapi-5D3FD3?style=for-the-badge" />
 </p>
 
-## 🌟 Overview
+Just give a start⭐️ if you like it ;)
+
+## 🌟 Overview 
 
 VoiceForge is a complete AI Voice Agent platform that enables businesses to create intelligent voice assistants for both **inbound** (receiving calls) and **outbound** (making calls) scenarios. Built with modern tech stack including Next.js, Express, MongoDB, and Vapi.
 
