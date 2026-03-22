@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import { Types } from 'mongoose';
 import { config } from '../../config';
 import { Agent, CallLog, User, CreditLedger, Campaign, CsvContact, UserKnowledgeContext } from '../../db';
 import { buildSystemPrompt, buildPersonaPrompt, buildCompactSystemPrompt, buildCombinedSystemPrompt, type KnowledgeFile } from '../../services/contextBuilder.service';
@@ -427,57 +428,88 @@ async function handleStatusUpdate(message: any, res: Response): Promise<void> {
     const { call, status, customer, phoneNumber } = message;
     const vapiCallId = call?.id;
 
-    console.log(`[Vapi Webhook] Status update: ${status} for call ${vapiCallId}`);
-    console.log('[Vapi Webhook] Full call object:', JSON.stringify(call, null, 2));
+    console.log(`\n🔄 [Vapi Webhook] ===== STATUS UPDATE =====`);
+    console.log(`[Vapi Webhook] Status: ${status}, Call ID: ${vapiCallId}`);
 
-    if (vapiCallId) {
-      const mappedStatus = mapVapiStatus(status);
+    if (!vapiCallId) {
+      console.log('[Vapi Webhook] ❌ No vapiCallId, skipping');
+      res.json({ received: true });
+      return;
+    }
 
-      // Check if call log exists - if not, create it (for new calls)
-      const existingLog = await CallLog.findOne({ vapiCallId });
-      console.log(`[Vapi Webhook] Existing log:`, existingLog ? 'YES' : 'NO');
+    const mappedStatus = mapVapiStatus(status);
+    console.log(`[Vapi Webhook] Mapped status: ${mappedStatus}`);
 
-      if (!existingLog && (status === 'in-progress' || status === 'initiated')) {
-        // Create new call log - try multiple locations for metadata
-        const userId = call?.metadata?.userId || message?.userId;
-        const agentId = call?.metadata?.agentId || message?.agentId;
-        const direction = call?.type === 'inboundPhoneCall' ? 'inbound' : 'outbound';
+    // Check if call log exists
+    const existingLog = await CallLog.findOne({ vapiCallId });
+    console.log(`[Vapi Webhook] Existing log: ${existingLog ? 'YES' : 'NO'}`);
 
-        console.log(`[Vapi Webhook] Creating call log: userId=${userId}, agentId=${agentId}`);
+    if (!existingLog && (status === 'in-progress' || status === 'initiated' || status === 'ringing')) {
+      // Extract metadata
+      let userId = call?.metadata?.userId || message?.metadata?.userId;
+      let agentId = call?.metadata?.agentId || message?.metadata?.agentId;
+      const direction = call?.type === 'inboundPhoneCall' ? 'inbound' : 'outbound';
 
-        if (userId && agentId) {
+      console.log(`[Vapi Webhook] Raw metadata from call:`, JSON.stringify(call?.metadata));
+      console.log(`[Vapi Webhook] Extracted: userId=${userId}, agentId=${agentId}`);
+
+      // For inbound calls, look up agent by assistant ID
+      if (!userId || !agentId) {
+        const vapiAssistantId = call?.assistant?.id || call?.assistantId || call?.assistant_id;
+        console.log(`[Vapi Webhook] Looking up agent by vapiAssistantId: ${vapiAssistantId}`);
+
+        if (vapiAssistantId) {
           try {
-            await CallLog.create({
-              userId,
-              agentId,
-              vapiCallId,
-              status: mappedStatus,
-              direction,
-              toNumber: customer?.number || call?.customer?.number,
-              fromNumber: phoneNumber?.number || call?.phoneNumber?.number,
-              startedAt: new Date()
-            });
-            console.log(`[Vapi Webhook] ✅ Created new call log for ${vapiCallId}`);
-          } catch (createErr: any) {
-            console.error('[Vapi Webhook] Failed to create call log:', createErr.message);
+            const agent = await Agent.findOne({ vapiAgentId: vapiAssistantId });
+            if (agent) {
+              userId = agent.userId.toString();
+              agentId = agent._id.toString();
+              console.log(`[Vapi Webhook] ✅ Found agent: ${agent.name}, userId: ${userId}`);
+            } else {
+              console.log(`[Vapi Webhook] ⚠️ No agent found with vapiAgentId: ${vapiAssistantId}`);
+            }
+          } catch (agentErr: any) {
+            console.error('[Vapi Webhook] Error looking up agent:', agentErr.message);
           }
-        } else {
-          console.log(`[Vapi Webhook] ⚠️ Cannot create call log: userId=${userId}, agentId=${agentId}`);
         }
-      } else if (existingLog) {
-        // Update existing
-        await CallLog.findOneAndUpdate(
-          { vapiCallId },
-          { status: mappedStatus },
-          { new: true }
-        );
-        console.log(`[Vapi Webhook] Updated call log status to ${mappedStatus}`);
       }
+
+      if (userId && agentId) {
+        try {
+          // Convert string IDs to ObjectIds
+          const userObjectId = new Types.ObjectId(userId);
+          const agentObjectId = new Types.ObjectId(agentId);
+
+          const newLog = await CallLog.create({
+            userId: userObjectId,
+            agentId: agentObjectId,
+            vapiCallId,
+            status: mappedStatus,
+            direction,
+            toNumber: customer?.number || call?.customer?.number,
+            fromNumber: phoneNumber?.number || call?.phoneNumber?.number,
+            startedAt: new Date()
+          });
+          console.log(`[Vapi Webhook] ✅ Created CallLog: ${newLog._id}`);
+        } catch (createErr: any) {
+          console.error('[Vapi Webhook] ❌ Failed to create CallLog:', createErr.message);
+        }
+      } else {
+        console.log(`[Vapi Webhook] ⚠️ Cannot create call log: missing userId=${userId}, agentId=${agentId}`);
+      }
+    } else if (existingLog) {
+      // Update existing
+      await CallLog.findOneAndUpdate(
+        { vapiCallId },
+        { status: mappedStatus },
+        { new: true }
+      );
+      console.log(`[Vapi Webhook] Updated call log status to ${mappedStatus}`);
     }
 
     res.json({ received: true });
-  } catch (err) {
-    console.error('[Vapi Webhook] Status update error:', err);
+  } catch (err: any) {
+    console.error('[Vapi Webhook] ❌ Status update error:', err.message);
     res.json({ received: true });
   }
 }
@@ -489,20 +521,14 @@ async function handleStatusUpdate(message: any, res: Response): Promise<void> {
  */
 async function handleEndOfCallReport(message: any, res: Response): Promise<void> {
   try {
-    const { call, transcript, recordingUrl, summary } = message;
+    const { call, transcript, recordingUrl, summary, artifact } = message;
     const vapiCallId = call?.id;
 
-    console.log(`[Vapi Webhook] End of call report for ${vapiCallId}`);
-    console.log('[Vapi Webhook] Call data:', JSON.stringify({
-      id: call?.id,
-      type: call?.type,
-      metadata: call?.metadata,
-      startedAt: call?.startedAt,
-      endedAt: call?.endedAt
-    }, null, 2));
+    console.log(`\n📞 [Vapi Webhook] ===== END OF CALL REPORT =====`);
+    console.log(`[Vapi Webhook] Call ID: ${vapiCallId}`);
 
     if (!vapiCallId) {
-      console.log('[Vapi Webhook] No vapiCallId, skipping');
+      console.log('[Vapi Webhook] ❌ No vapiCallId, skipping');
       res.json({ received: true });
       return;
     }
@@ -511,46 +537,66 @@ async function handleEndOfCallReport(message: any, res: Response): Promise<void>
     const endedAt = call?.endedAt ? new Date(call.endedAt) : new Date();
     const durationSec = Math.max(0, Math.floor((endedAt.getTime() - startedAt.getTime()) / 1000));
 
-    // Get call direction from existing CallLog or infer from call type
+    console.log(`[Vapi Webhook] Duration: ${durationSec}s, Started: ${startedAt.toISOString()}`);
+
+    // Get existing call log
     let callLog = await CallLog.findOne({ vapiCallId });
     let direction = callLog?.direction || (call?.type === 'inboundPhoneCall' ? 'inbound' : 'outbound');
 
-    // Calculate credits based on direction
-    // Outbound: 3 credits/min, Inbound: 2 credits/min
+    // Calculate credits
     const costPerMin = direction === 'inbound' ? 2 : 3;
-    const credits = Math.max(1, Math.ceil(durationSec / 60) * costPerMin); // Minimum 1 credit
+    const credits = Math.max(1, Math.ceil(durationSec / 60) * costPerMin);
 
-    console.log(`[Vapi Webhook] Call ended: ${direction}, ${durationSec}s, ${credits} credits`);
+    console.log(`[Vapi Webhook] Direction: ${direction}, Credits: ${credits}`);
 
-    // Parse transcript from Vapi format (string) to our format (array)
+    // Parse transcript
     let parsedTranscript: Array<{role: string; text: string; timestamp: number}> = [];
     const baseTime = isNaN(startedAt.getTime()) ? Date.now() : startedAt.getTime();
-    if (transcript && typeof transcript === 'string') {
-      // Vapi sends transcript as "AI: ...\nUser: ...\n"
-      const lines = transcript.split('\n').filter(line => line.trim());
+
+    // Try multiple transcript sources
+    const transcriptSource = transcript || artifact?.transcript || message?.transcript;
+    if (transcriptSource && typeof transcriptSource === 'string') {
+      const lines = transcriptSource.split('\n').filter(line => line.trim());
       parsedTranscript = lines.map((line, index) => {
-        const isAI = line.startsWith('AI:');
-        const text = isAI ? line.substring(3).trim() : (line.startsWith('User:') ? line.substring(5).trim() : line);
-        return {
-          role: isAI ? 'assistant' : 'user',
-          text: text,
-          timestamp: baseTime + (index * 1000)
-        };
+        const isAI = line.startsWith('AI:') || line.startsWith('Assistant:') || line.startsWith('Bot:');
+        const text = isAI ? line.replace(/^(AI:|Assistant:|Bot:)\s*/, '').trim()
+                        : line.replace(/^(User:|Customer:|Human:)\s*/, '').trim();
+        return { role: isAI ? 'assistant' : 'user', text, timestamp: baseTime + (index * 1000) };
       });
-    } else if (Array.isArray(transcript)) {
-      parsedTranscript = transcript.map((entry: any) => ({
+      console.log(`[Vapi Webhook] Parsed ${parsedTranscript.length} transcript entries`);
+    } else if (Array.isArray(transcriptSource)) {
+      parsedTranscript = transcriptSource.map((entry: any) => ({
         role: entry.role === 'bot' ? 'assistant' : entry.role,
         text: entry.message || entry.content || entry.text,
         timestamp: entry.time || entry.timestamp || Date.now()
       }));
+    } else {
+      console.log('[Vapi Webhook] No transcript found');
     }
 
     // Extract metadata
-    const userId = call?.metadata?.userId || message?.userId;
-    const agentId = call?.metadata?.agentId || message?.agentId;
+    let userId = call?.metadata?.userId || message?.metadata?.userId;
+    let agentId = call?.metadata?.agentId || message?.metadata?.agentId;
+
+    console.log(`[Vapi Webhook] Metadata: userId=${userId}, agentId=${agentId}`);
+
+    // Look up agent for inbound calls
+    if (!userId || !agentId) {
+      const vapiAssistantId = call?.assistant?.id || call?.assistantId || call?.assistant_id;
+      console.log(`[Vapi Webhook] Looking up agent by: ${vapiAssistantId}`);
+
+      if (vapiAssistantId) {
+        const agent = await Agent.findOne({ vapiAgentId: vapiAssistantId });
+        if (agent) {
+          userId = agent.userId.toString();
+          agentId = agent._id.toString();
+          console.log(`[Vapi Webhook] ✅ Found agent: ${agent.name}`);
+        }
+      }
+    }
 
     if (callLog) {
-      // Update existing call log
+      // Update existing
       callLog = await CallLog.findOneAndUpdate(
         { vapiCallId },
         {
@@ -560,74 +606,64 @@ async function handleEndOfCallReport(message: any, res: Response): Promise<void>
           creditsUsed: credits,
           endedAt,
           startedAt,
-          recordingUrl,
+          recordingUrl: recordingUrl || artifact?.recording?.combinedUrl,
           summary
         },
         { new: true }
       );
-      console.log(`[Vapi Webhook] Updated existing call log`);
+      console.log(`[Vapi Webhook] ✅ Updated existing call log: ${callLog?._id}`);
     } else if (userId && agentId) {
-      // Create new call log if it doesn't exist (e.g., if status-update was missed)
-      callLog = await CallLog.create({
-        userId,
-        agentId,
-        vapiCallId,
-        status: 'completed',
-        direction,
-        toNumber: call?.customer?.number,
-        fromNumber: call?.phoneNumber?.number,
-        transcript: parsedTranscript,
-        durationSec,
-        creditsUsed: credits,
-        startedAt,
-        endedAt,
-        recordingUrl,
-        summary
-      });
-      console.log(`[Vapi Webhook] Created call log in end-of-call-report`);
+      // Create new
+      try {
+        callLog = await CallLog.create({
+          userId: new Types.ObjectId(userId),
+          agentId: new Types.ObjectId(agentId),
+          vapiCallId,
+          status: 'completed',
+          direction,
+          toNumber: call?.customer?.number,
+          fromNumber: call?.phoneNumber?.number,
+          transcript: parsedTranscript,
+          durationSec,
+          creditsUsed: credits,
+          startedAt,
+          endedAt,
+          recordingUrl: recordingUrl || artifact?.recording?.combinedUrl,
+          summary
+        });
+        console.log(`[Vapi Webhook] ✅ Created new call log: ${callLog._id}`);
+      } catch (createErr: any) {
+        console.error('[Vapi Webhook] ❌ Failed to create call log:', createErr.message);
+      }
     } else {
-      console.log(`[Vapi Webhook] ⚠️ Cannot create/update call log: missing userId=${userId}, agentId=${agentId}`);
+      console.log(`[Vapi Webhook] ⚠️ Cannot create/update: missing userId=${userId}, agentId=${agentId}`);
     }
 
     if (callLog) {
-      // Deduct credits
-      const previousCredits = await User.findById(callLog.userId).select('credits');
-      await User.findByIdAndUpdate(callLog.userId, { $inc: { credits: -credits } });
-      console.log(`[Vapi Webhook] Deducted ${credits} credits from user ${callLog.userId}`);
-      console.log(`[Vapi Webhook] Credits before: ${previousCredits?.credits || 'unknown'}, after: ${(previousCredits?.credits || 0) - credits}`);
+      try {
+        // Deduct credits
+        const previousCredits = await User.findById(callLog.userId).select('credits');
+        await User.findByIdAndUpdate(callLog.userId, { $inc: { credits: -credits } });
+        console.log(`[Vapi Webhook] ✅ Deducted ${credits} credits. User ${callLog.userId} credits: ${previousCredits?.credits || 'unknown'} → ${(previousCredits?.credits || 0) - credits}`);
 
-      // Record in ledger
-      await CreditLedger.create({
-        userId: callLog.userId,
-        type: 'deduct',
-        amount: -credits,
-        description: `${direction} call ${durationSec}s (${costPerMin}/min)`,
-        callLogId: callLog._id
-      });
-      console.log(`[Vapi Webhook] Created credit ledger entry`);
-
-      // Update campaign stats if applicable
-      if (callLog.csvContactId && callLog.campaignId) {
-        const isAnswered = transcript && transcript.length > 1;
-
-        await CsvContact.findByIdAndUpdate(callLog.csvContactId, {
-          status: isAnswered ? 'answered' : 'no-answer',
-          callLogId: callLog._id,
-          calledAt: new Date()
+        // Record in ledger
+        await CreditLedger.create({
+          userId: callLog.userId,
+          type: 'deduct',
+          amount: -credits,
+          description: `${direction} call ${durationSec}s (${costPerMin}/min)`,
+          callLogId: callLog._id
         });
-
-        await Campaign.findByIdAndUpdate(callLog.campaignId, {
-          $inc: {
-            called: 1,
-            ...(isAnswered ? { answered: 1 } : { noAnswer: 1 })
-          }
-        });
+        console.log(`[Vapi Webhook] ✅ Created credit ledger entry`);
+      } catch (creditErr: any) {
+        console.error('[Vapi Webhook] ❌ Error deducting credits:', creditErr.message);
       }
     }
 
+    console.log(`[Vapi Webhook] ===== END OF REPORT =====\n`);
     res.json({ received: true });
-  } catch (err) {
-    console.error('[Vapi Webhook] End of call report error:', err);
+  } catch (err: any) {
+    console.error('[Vapi Webhook] ❌ End of call report error:', err.message);
     res.json({ received: true });
   }
 }

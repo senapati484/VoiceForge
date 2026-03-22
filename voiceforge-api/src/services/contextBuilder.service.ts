@@ -11,7 +11,8 @@ function getGeminiClient(): ChatGoogleGenerativeAI {
   return new ChatGoogleGenerativeAI({
     apiKey: config.gemini.apiKey,
     model: config.gemini.model,
-    temperature: 0
+    temperature: 0,
+      
   });
 }
 

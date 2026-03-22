@@ -67,7 +67,27 @@ router.get('/', requireAuth, async (req, res, next) => {
       .limit(limit)
       .populate('agentId', 'name agentType');
 
-    res.json({ calls, page });
+    // Transform calls to match frontend expectations
+    const transformedCalls = calls.map(call => {
+      const callObj = call.toObject();
+      return {
+        ...callObj,
+        id: callObj._id.toString(),
+        agentId: callObj.agentId?._id?.toString() || callObj.agentId?.toString(),
+        agentName: callObj.agentId?.name || 'Unknown Agent',
+        // Ensure all fields are present
+        direction: callObj.direction,
+        toNumber: callObj.toNumber || callObj.fromNumber,
+        status: callObj.status,
+        durationSec: callObj.durationSec,
+        transcript: callObj.transcript,
+        creditsUsed: callObj.creditsUsed,
+        createdAt: callObj.createdAt?.toISOString(),
+        campaignId: callObj.campaignId?.toString()
+      };
+    });
+
+    res.json({ calls: transformedCalls, page });
   } catch (err) {
     next(err);
   }
