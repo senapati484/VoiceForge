@@ -84,6 +84,7 @@ voiceforge/
 
 ---
 
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -175,6 +176,12 @@ NEXT_PUBLIC_API_URL=http://localhost:4000
 
 ---
 
+### Visual Demo(pages)
+<img width="1710" height="986" alt="Home-Page" src="https://github.com/user-attachments/assets/732c9ddd-ac10-493e-9c85-a5052f000c6b" />
+<img width="1710" height="986" alt="Agent-Page" src="https://github.com/user-attachments/assets/4d39b3d9-199b-4220-a819-f907e7e97e2d" />
+<img width="1710" height="986" alt="Knoledge-Page" src="https://github.com/user-attachments/assets/7885e188-dc5f-439a-a4d7-bc611538029d" />
+<img width="1710" height="985" alt="Pricing-Page" src="https://github.com/user-attachments/assets/a7a3b7fb-9aa5-4967-8f8d-6fa6e45557bf" />
+
 ## 🎯 Core Workflows
 
 ### Creating an AI Agent
@@ -187,6 +194,7 @@ NEXT_PUBLIC_API_URL=http://localhost:4000
    - Description & Call Objective
    - Voice (with preview)
 4. Deploy - Creates Vapi assistant automatically
+
 
 ### Running Outbound Campaign
 
