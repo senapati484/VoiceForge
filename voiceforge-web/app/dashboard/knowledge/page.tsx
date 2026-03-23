@@ -103,7 +103,13 @@ export default function KnowledgePage() {
       if (result.context?.generatedAt) {
         await mutateContext();
       }
-      toast.success("Context generated successfully");
+
+      // Show success with stats
+      const stats = result.stats;
+      toast.success(`Context generated successfully!`, {
+        description: `Processed ${stats.documentsProcessed} document(s). Found ${stats.productsFound} products and ${stats.qaPairs} Q&A pairs.`,
+        duration: 5000
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Generate context failed";
       toast.error(message);
@@ -189,6 +195,14 @@ export default function KnowledgePage() {
         },
       ]);
       setUrl("");
+
+      // Show enhanced feedback
+      if (res.stats.readyForContext) {
+        toast.success(`Scraped successfully! You now have ${res.stats.totalDocs} document(s).`, {
+          description: res.nextStep,
+          duration: 5000
+        });
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Scrape failed";
       toast.error(message);
@@ -283,9 +297,19 @@ export default function KnowledgePage() {
             </p>
           ) : (
             <>
-              <p className="text-sm text-slate-600">
-                Last generated: {new Date(storedContext.generatedAt).toLocaleString()}
-              </p>
+              <div className="flex flex-wrap gap-2 text-xs text-slate-600">
+                <Badge variant="secondary">
+                  Last: {new Date(storedContext.generatedAt).toLocaleString()}
+                </Badge>
+                {storedContext.stats && (
+                  <>
+                    <Badge variant="outline">{storedContext.stats.businessSummaryLength} chars summary</Badge>
+                    <Badge variant="outline">{storedContext.stats.productsFound} Products</Badge>
+                    <Badge variant="outline">{storedContext.stats.qaPairs} Q&A</Badge>
+                    <Badge variant="outline">{storedContext.stats.importantFacts} Facts</Badge>
+                  </>
+                )}
+              </div>
               <pre className="max-h-64 overflow-auto rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-800">
                 {JSON.stringify(storedContext.knowledgeFile, null, 2)}
               </pre>

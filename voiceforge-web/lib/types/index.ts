@@ -28,6 +28,15 @@ export interface StoredKnowledgeContext {
   id: string;
   knowledgeFile: KnowledgeFile;
   generatedAt: string;
+  // Stats from generation (may not persist across reloads)
+  stats?: {
+    documentsProcessed?: number;
+    businessSummaryLength: number;
+    productsFound: number;
+    qaPairs: number;
+    importantFacts: number;
+    escalationTriggers: number;
+  };
 }
 
 // Agent Types
@@ -60,6 +69,36 @@ export interface KnowledgeDoc {
   status: 'pending' | 'processing' | 'ready' | 'error';
   chunkCount?: number;
   errorMsg?: string;
+}
+
+export interface ScrapeResult {
+  docId: string;
+  status: string;
+  sourceUrl: string;
+  contentPreview: string;
+  stats: {
+    totalDocs: number;
+    readyForContext: boolean;
+  };
+  nextStep: string;
+}
+
+export interface ContextGenerationResult {
+  success: boolean;
+  knowledgeFile: KnowledgeFile;
+  stats: {
+    documentsProcessed: number;
+    businessSummaryLength: number;
+    productsFound: number;
+    qaPairs: number;
+    importantFacts: number;
+    escalationTriggers: number;
+  };
+  context: {
+    id: string;
+    generatedAt: string;
+    isReady: boolean;
+  };
 }
 
 // Campaign Types

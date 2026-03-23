@@ -218,7 +218,7 @@ router.post('/chat/completions/sync', async (req: Request, res: Response) => {
       return;
     }
 
-    const groqData = await groqResponse.json();
+    const groqData = await groqResponse.json() as { choices?: [{ message?: { content?: string } }]; usage?: unknown };
     const content = groqData.choices?.[0]?.message?.content || '';
 
     const duration = Date.now() - startTime;

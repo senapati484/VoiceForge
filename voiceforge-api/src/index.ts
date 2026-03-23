@@ -15,6 +15,7 @@ import creditRoutes from './routes/credits';
 import voiceRoutes from './routes/voices';
 import campaignRoutes from './routes/campaigns';
 import llmRoutes from './routes/llm';
+import { addDebugRoutes } from './routes/debug';
 
 // Middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -65,6 +66,10 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/auth', authRoutes);
 app.use('/api/agents', agentRoutes);
 app.use('/api/calls', callRoutes);
+
+// Debug routes (BEFORE auth-required knowledge routes)
+addDebugRoutes(app);
+
 app.use('/api/knowledge', knowledgeRoutes);
 app.use('/api/credits', creditRoutes);
 app.use('/api/voices', voiceRoutes);

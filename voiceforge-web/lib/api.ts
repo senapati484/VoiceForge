@@ -10,7 +10,9 @@ import type {
   StoredKnowledgeContext,
   VoiceOption,
   CreditTransaction,
-  User
+  User,
+  ScrapeResult,
+  ContextGenerationResult
 } from './types';
 
 const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
@@ -128,7 +130,7 @@ export const knowledgeApi = {
     });
     return res.data;
   },
-  scrape: async (url: string, agentId?: string): Promise<{ docId: string; status: string }> => {
+  scrape: async (url: string, agentId?: string): Promise<ScrapeResult> => {
     const res = await http.post('/knowledge/scrape', { url, agentId });
     return res.data;
   },
@@ -148,7 +150,7 @@ export const knowledgeApi = {
   },
   generateContext: async (
     agentType?: 'marketing' | 'support' | 'sales' | 'tech'
-  ): Promise<{ success: boolean; knowledgeFile: unknown; context?: { generatedAt?: string } }> => {
+  ): Promise<ContextGenerationResult> => {
     const res = await http.post('/knowledge/generate-context', { agentType: agentType ?? 'support' });
     return res.data;
   },

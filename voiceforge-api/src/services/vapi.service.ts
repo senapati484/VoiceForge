@@ -44,7 +44,7 @@ function getOpeningLine(agent: IAgent): string {
 }
 
 export async function createVapiAssistant(agent: IAgent): Promise<string> {
-  const systemPrompt = buildSystemPrompt(agent, []);
+  const systemPrompt = buildSystemPrompt(agent, null);
   const requestBody = {
     name: agent.name,
     // Voice config - vapi voices don't support fallback

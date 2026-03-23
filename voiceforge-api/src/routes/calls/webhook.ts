@@ -35,7 +35,15 @@ export async function webhookHandler(req: Request, res: Response): Promise<void>
 
         // Retrieve relevant chunks from Pinecone
         const chunks = await retrieveText(userId, query, 3);
-        const systemPrompt = buildSystemPrompt(agent, chunks);
+        // Build context from retrieved chunks
+        const contextParts = [
+          `You are ${agent.name}, ${agent.agentType} agent for ${agent.businessName}.`,
+          `Goal: ${agent.callObjective}`,
+          '',
+          'Relevant knowledge from documents:',
+          ...chunks
+        ];
+        const systemPrompt = contextParts.join('\n');
 
         res.json({ result: systemPrompt });
         return;

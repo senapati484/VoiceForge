@@ -70,11 +70,13 @@ router.get('/', requireAuth, async (req, res, next) => {
     // Transform calls to match frontend expectations
     const transformedCalls = calls.map(call => {
       const callObj = call.toObject();
+      // agentId is populated with name and agentType
+      const populatedAgent = callObj.agentId as unknown as { _id?: { toString(): string }; name?: string; toString?: () => string } | undefined;
       return {
         ...callObj,
         id: callObj._id.toString(),
-        agentId: callObj.agentId?._id?.toString() || callObj.agentId?.toString(),
-        agentName: callObj.agentId?.name || 'Unknown Agent',
+        agentId: populatedAgent?._id?.toString() || populatedAgent?.toString?.() || callObj.agentId?.toString(),
+        agentName: populatedAgent?.name || 'Unknown Agent',
         // Ensure all fields are present
         direction: callObj.direction,
         toNumber: callObj.toNumber || callObj.fromNumber,

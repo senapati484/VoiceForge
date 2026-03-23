@@ -388,8 +388,16 @@ async function executeTool(name: string, parameters: any, call: any): Promise<an
         const agent = await Agent.findById(agentId);
         if (agent) {
           const chunks = await retrieveText(userId, query, 3);
+          // Build context from retrieved chunks
+          const contextParts = [
+            `You are ${agent.name}, ${agent.agentType} agent for ${agent.businessName}.`,
+            `Goal: ${agent.callObjective}`,
+            '',
+            'Relevant knowledge from documents:',
+            ...chunks
+          ];
           return {
-            context: buildSystemPrompt(agent, chunks)
+            context: contextParts.join('\n')
           };
         }
       }
@@ -674,7 +682,15 @@ async function handleFunctionCall(message: any, res: Response): Promise<void> {
     }
 
     const chunks = await retrieveText(userId, query, 3);
-    const systemPrompt = buildSystemPrompt(agent, chunks);
+    // Build context from retrieved chunks
+    const contextParts = [
+      `You are ${agent.name}, ${agent.agentType} agent for ${agent.businessName}.`,
+      `Goal: ${agent.callObjective}`,
+      '',
+      'Relevant knowledge from documents:',
+      ...chunks
+    ];
+    const systemPrompt = contextParts.join('\n');
 
     res.json({ result: systemPrompt });
   } catch (err) {

@@ -133,9 +133,9 @@ export async function ingestDocument(docId: string): Promise<void> {
 
 async function extractPdfText(buffer: Buffer): Promise<string> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const pdfParse = require('pdf-parse');
-    const data = await pdfParse(buffer);
+    const pdfModule = await import('pdf-parse');
+    const parser = new pdfModule.PDFParse({ data: buffer });
+    const data = await parser.getText();
     return data.text;
   } catch {
     // Fallback: try to extract any readable text
