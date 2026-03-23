@@ -33,7 +33,31 @@ app.use(cors({
   credentials: true
 }));
 
-// 3. Request logging
+// 3. Request logging - CUSTOM DETAILED LOGGER
+app.use((req, res, next) => {
+  const start = Date.now();
+  const reqId = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+  console.log(`[API ${reqId}] >>> ${req.method} ${req.path} - START`);
+  console.log(`[API ${reqId}] Query:`, JSON.stringify(req.query));
+  console.log(`[API ${reqId}] Headers:`, JSON.stringify({
+    authorization: req.headers.authorization ? 'Bearer ***' : 'none',
+    'content-type': req.headers['content-type'],
+    origin: req.headers.origin
+  }));
+
+  // Log response when finished
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    const status = res.statusCode;
+    const statusEmoji = status < 400 ? '✅' : status < 500 ? '⚠️' : '❌';
+    console.log(`[API ${reqId}] <<< ${req.method} ${req.path} - ${status} ${statusEmoji} (${duration}ms)`);
+  });
+
+  next();
+});
+
+// Also keep morgan for additional format
 app.use(morgan('dev'));
 
 // 4. RAW body parser for Vapi webhooks ONLY — MUST be before express.json()
@@ -70,7 +94,9 @@ app.use('/api/calls', callRoutes);
 // Debug routes (BEFORE auth-required knowledge routes)
 addDebugRoutes(app);
 
+console.log('[Server] Mounting knowledge routes...');
 app.use('/api/knowledge', knowledgeRoutes);
+console.log('[Server] Knowledge routes mounted');
 app.use('/api/credits', creditRoutes);
 app.use('/api/voices', voiceRoutes);
 app.use('/api/campaigns', campaignRoutes);

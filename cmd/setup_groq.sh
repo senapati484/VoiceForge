@@ -52,7 +52,7 @@ curl -s -X PATCH \
     \"model\": {
       \"provider\": \"custom-llm\",
       \"url\": \"$NGROK_URL/api/llm/chat/completions\",
-      \"model\": \"llama-3.1-70b-versatile\",
+      \"model\": \"llama-3.3-70b-versatile\",
       \"temperature\": 0.6
     }
   }" \
@@ -68,7 +68,7 @@ TEST_RESPONSE=$(curl -s -X POST \
   -H "Authorization: Bearer $GROQ_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "llama-3.1-70b-versatile",
+    "model": "llama-3.3-70b-versatile",
     "messages": [{"role": "user", "content": "Say hello"}],
     "temperature": 0.6
   }')

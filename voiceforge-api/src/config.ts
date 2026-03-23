@@ -139,7 +139,7 @@ export const config = {
   // Groq — primary LLM for voice calls (fast, good free tier)
   groq: {
     apiKey: firstEnv(['GROQ_API_KEY']),
-    model: process.env.GROQ_MODEL || 'llama-3.1-70b-versatile'
+    model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'
   },
   context: {
     provider: (process.env.CONTEXT_PROVIDER || 'gemini') as 'hf' | 'gemini'

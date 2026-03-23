@@ -97,9 +97,14 @@ export default function KnowledgePage() {
   };
 
   const handleGenerateContext = async () => {
+    console.log('[Frontend] handleGenerateContext called');
+    console.log('[Frontend] docs.length:', docs.length);
+    console.log('[Frontend] docs:', docs.map(d => ({ id: d.id, status: d.status, type: d.type })));
     setIsGeneratingContext(true);
     try {
+      console.log('[Frontend] Calling api.knowledge.generateContext...');
       const result = await api.knowledge.generateContext("support");
+      console.log('[Frontend] api.knowledge.generateContext returned:', result);
       if (result.context?.generatedAt) {
         await mutateContext();
       }
@@ -111,7 +116,9 @@ export default function KnowledgePage() {
         duration: 5000
       });
     } catch (error) {
+      console.error('[Frontend] handleGenerateContext error:', error);
       const message = error instanceof Error ? error.message : "Generate context failed";
+      console.error('[Frontend] Error message:', message);
       toast.error(message);
     } finally {
       setIsGeneratingContext(false);

@@ -76,46 +76,65 @@ async function streamToBuffer(body: any): Promise<Buffer> {
  */
 async function extractTextFromDoc(doc: IKnowledgeDoc): Promise<string> {
   try {
-    console.log(`[ContextBuilder] Extracting text from doc ${doc._id}, type: ${doc.type}`);
+    console.log(`[ContextBuilder] ====== START extractTextFromDoc for doc ${doc._id} ======`);
+    console.log(`[ContextBuilder] Doc type: ${doc.type}, filename: ${doc.filename}, r2Key: ${doc.r2Key}`);
+
     const file = await getFileFromR2(doc.r2Key);
+    console.log(`[ContextBuilder] File fetched from R2: ${!!file}`);
+    console.log(`[ContextBuilder] File.Body exists: ${!!file.Body}`);
+    console.log(`[ContextBuilder] File.ContentType: ${file.ContentType}`);
+    console.log(`[ContextBuilder] File.ContentLength: ${file.ContentLength}`);
 
     if (!file.Body) {
-      console.error(`[ContextBuilder] Empty file for doc ${doc._id}`);
+      console.error(`[ContextBuilder] ERROR: Empty file body for doc ${doc._id}`);
       return '';
     }
 
     // Convert body to buffer
     const buffer = await streamToBuffer(file.Body);
-
-    console.log(`[ContextBuilder] File size: ${buffer.length} bytes`);
+    console.log(`[ContextBuilder] Buffer created: ${buffer.length} bytes`);
+    console.log(`[ContextBuilder] First 20 bytes (hex): ${buffer.slice(0, 20).toString('hex')}`);
+    console.log(`[ContextBuilder] First 20 bytes (ascii): ${buffer.slice(0, 20).toString('ascii')}`);
 
     let text = '';
+    console.log(`[ContextBuilder] Switching on doc.type: ${doc.type}`);
     switch (doc.type) {
       case 'pdf':
+        console.log('[ContextBuilder] Extracting PDF text...');
         text = await extractPdfText(buffer);
         break;
       case 'docx':
+        console.log('[ContextBuilder] Extracting DOCX text...');
         text = await extractDocxText(buffer);
         break;
       case 'txt':
       case 'scrape':
+        console.log('[ContextBuilder] Converting buffer to UTF8 string for txt/scrape...');
         text = buffer.toString('utf8');
         break;
       default:
+        console.log(`[ContextBuilder] Unknown type "${doc.type}", trying UTF8 conversion...`);
         text = buffer.toString('utf8');
     }
 
+    console.log(`[ContextBuilder] Raw text extracted: ${text.length} chars`);
+    console.log(`[ContextBuilder] Raw text preview: ${text.slice(0, 100).replace(/\n/g, '\\n')}`);
+
     // Validate extracted text
-    if (!isValidText(text)) {
-      console.error(`[ContextBuilder] Invalid/garbled text extracted from doc ${doc._id}`);
-      console.error(`[ContextBuilder] Text preview: ${text.slice(0, 200)}`);
+    const isValid = isValidText(text);
+    console.log(`[ContextBuilder] isValidText result: ${isValid}`);
+
+    if (!isValid) {
+      console.error(`[ContextBuilder] ERROR: Text validation failed for doc ${doc._id}`);
+      console.error(`[ContextBuilder] Text sample: ${text.slice(0, 500)}`);
       return '';
     }
 
-    console.log(`[ContextBuilder] Successfully extracted ${text.length} characters from doc ${doc._id}`);
+    console.log(`[ContextBuilder] ====== SUCCESS extractTextFromDoc for doc ${doc._id}: ${text.length} chars ======`);
     return text;
-  } catch (err) {
-    console.error(`[ContextBuilder] Failed to extract text from doc ${doc._id}:`, err);
+  } catch (err: any) {
+    console.error(`[ContextBuilder] FAILED extractTextFromDoc for doc ${doc._id}:`, err);
+    console.error('[ContextBuilder] Error stack:', err.stack);
     return '';
   }
 }
@@ -124,23 +143,38 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
   try {
     // Check if it's actually a PDF
     const header = buffer.slice(0, 8).toString('ascii');
-    console.log(`[ContextBuilder] PDF header: ${header}`);
+    const hexHeader = buffer.slice(0, 4).toString('hex');
+    console.log(`[ContextBuilder] PDF header (ascii): ${header}`);
+    console.log(`[ContextBuilder] PDF header (hex): ${hexHeader}`);
+    console.log(`[ContextBuilder] Buffer length: ${buffer.length} bytes`);
 
     if (!header.startsWith('%PDF')) {
       console.error('[ContextBuilder] File is not a valid PDF (missing %PDF header)');
+      console.error(`[ContextBuilder] First 100 bytes: ${buffer.slice(0, 100).toString('hex')}`);
       return '';
     }
 
-    console.log(`[ContextBuilder] Calling pdf-parse on ${buffer.length} bytes...`);
+    console.log(`[ContextBuilder] Calling pdf-parse...`);
 
     const pdfModule = await import('pdf-parse');
-    const parser = new pdfModule.PDFParse({ data: buffer });
-    const data = await parser.getText();
+    console.log(`[ContextBuilder] pdf-parse module imported, type: ${typeof pdfModule}`);
+    console.log(`[ContextBuilder] pdf-parse module keys: ${Object.keys(pdfModule).join(', ')}`);
 
-    console.log(`[ContextBuilder] pdf-parse returned:`, {
-      hasText: !!data.text,
-      textLength: data.text?.length,
-    });
+    const { PDFParse } = pdfModule;
+    console.log(`[ContextBuilder] PDFParse type: ${typeof PDFParse}`);
+
+    if (!PDFParse) {
+      console.error('[ContextBuilder] PDFParse is undefined!');
+      return '';
+    }
+
+    const parser = new PDFParse({ data: buffer });
+    console.log(`[ContextBuilder] Parser created, calling getText()...`);
+
+    const data = await parser.getText();
+    console.log(`[ContextBuilder] getText() returned, type: ${typeof data}`);
+    console.log(`[ContextBuilder] data.text exists: ${!!data.text}`);
+    console.log(`[ContextBuilder] data.text length: ${data.text?.length || 0}`);
 
     if (!data.text || data.text.length < 50) {
       console.error('[ContextBuilder] PDF extraction returned empty or very short text');
@@ -153,13 +187,16 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
       .replace(/[\x01-\x08\x0B\x0C\x0E-\x1F]/g, '') // Remove control chars
       .trim();
 
+    console.log(`[ContextBuilder] After initial cleaning: ${text.length} chars`);
+    console.log(`[ContextBuilder] Text preview (first 200 chars): ${text.slice(0, 200).replace(/\n/g, '\\n')}`);
+
     // Additional cleaning for PDF artifacts
     text = text
       .replace(/\s+/g, ' ') // Normalize whitespace
       .replace(/\n{3,}/g, '\n\n') // Limit consecutive newlines
       .trim();
 
-    console.log(`[ContextBuilder] Cleaned PDF text length: ${text.length}`);
+    console.log(`[ContextBuilder] Final cleaned PDF text length: ${text.length}`);
 
     // If cleaned text is too short, return empty
     if (text.length < 50) {
@@ -168,8 +205,9 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
     }
 
     return text;
-  } catch (err) {
+  } catch (err: any) {
     console.error('[ContextBuilder] PDF extraction failed:', err);
+    console.error('[ContextBuilder] Error stack:', err.stack);
     return '';
   }
 }
@@ -178,22 +216,32 @@ async function extractDocxText(buffer: Buffer): Promise<string> {
   try {
     // Check if it's actually a DOCX (ZIP file starting with PK)
     const header = buffer.slice(0, 4).toString('hex');
+    console.log(`[ContextBuilder] DOCX header (hex): ${header}`);
+
     if (header !== '504b0304') {
       console.error('[ContextBuilder] File is not a valid DOCX (missing PK header)');
+      console.error(`[ContextBuilder] First 100 bytes: ${buffer.slice(0, 100).toString('hex')}`);
       return '';
     }
 
+    console.log(`[ContextBuilder] Calling mammoth extractRawText...`);
     const { default: mammoth } = await import('mammoth');
     const result = await mammoth.extractRawText({ buffer });
+
+    console.log(`[ContextBuilder] Mammoth result length: ${result.value?.length || 0}`);
+    console.log(`[ContextBuilder] Mammoth messages: ${result.messages?.length || 0} messages`);
 
     if (!result.value || result.value.length < 50) {
       console.error('[ContextBuilder] DOCX extraction returned empty or very short text');
       return '';
     }
 
+    console.log(`[ContextBuilder] DOCX text preview (first 200 chars): ${result.value.slice(0, 200).replace(/\n/g, '\\n')}`);
+
     return result.value;
-  } catch (err) {
+  } catch (err: any) {
     console.error('[ContextBuilder] DOCX extraction failed:', err);
+    console.error('[ContextBuilder] Error stack:', err.stack);
     return '';
   }
 }
@@ -229,19 +277,33 @@ export async function buildKnowledgeFile(userId: string): Promise<KnowledgeFile>
     console.log(`[ContextBuilder] Doc ${doc._id}: type=${doc.type}, filename=${doc.filename || 'N/A'}, sourceUrl=${doc.sourceUrl || 'N/A'}`);
   });
 
-  // Extract text from all documents
+  // Extract text from all documents with timeout per document
   const docTexts: { type: string; text: string; source?: string }[] = [];
+  const MAX_DOC_TIMEOUT = 10000; // 10 seconds per document max
+
   for (const doc of docs) {
-    const text = await extractTextFromDoc(doc);
-    if (text.trim()) {
-      docTexts.push({
-        type: doc.type,
-        text: text.slice(0, 50000), // Limit each doc to 50k chars
-        source: doc.filename || doc.sourceUrl
-      });
-      console.log(`[ContextBuilder] Added doc ${doc._id} to extraction list (${text.length} chars)`);
-    } else {
-      console.error(`[ContextBuilder] Skipping doc ${doc._id} - no valid text extracted`);
+    console.log(`[ContextBuilder] Processing doc ${doc._id} with ${MAX_DOC_TIMEOUT}ms timeout...`);
+
+    try {
+      const text = await Promise.race([
+        extractTextFromDoc(doc),
+        new Promise<string>((_, reject) =>
+          setTimeout(() => reject(new Error('Document extraction timeout')), MAX_DOC_TIMEOUT)
+        )
+      ]);
+
+      if (text.trim()) {
+        docTexts.push({
+          type: doc.type,
+          text: text.slice(0, 20000), // Limit each doc to 20k chars (reduced from 50k)
+          source: doc.filename || doc.sourceUrl
+        });
+        console.log(`[ContextBuilder] Added doc ${doc._id} to extraction list (${text.length} chars)`);
+      } else {
+        console.error(`[ContextBuilder] Skipping doc ${doc._id} - no valid text extracted`);
+      }
+    } catch (timeoutErr: any) {
+      console.error(`[ContextBuilder] Doc ${doc._id} extraction failed/timeout:`, timeoutErr.message);
     }
   }
 
@@ -281,8 +343,15 @@ export async function buildKnowledgeFile(userId: string): Promise<KnowledgeFile>
  * Extract structured knowledge from text using AI (Groq)
  */
 async function extractKnowledgeWithAI(text: string): Promise<KnowledgeFile> {
+  console.log(`[ContextBuilder] ====== START extractKnowledgeWithAI ======`);
+  console.log(`[ContextBuilder] Input text length: ${text.length}`);
+  console.log(`[ContextBuilder] Input text preview (first 500 chars): ${text.slice(0, 500).replace(/\n/g, '\\n')}`);
+
   // Final validation - ensure we're not sending binary/garbage to AI
-  if (!isValidText(text)) {
+  const isValid = isValidText(text);
+  console.log(`[ContextBuilder] Final validation result: ${isValid}`);
+
+  if (!isValid) {
     console.error('[ContextBuilder] Text failed final validation before AI extraction');
     return {
       businessSummary: 'Document content could not be properly extracted. Please ensure uploaded files contain readable text.',
@@ -294,17 +363,21 @@ async function extractKnowledgeWithAI(text: string): Promise<KnowledgeFile> {
   }
 
   // If no Groq API key, use fallback extraction
+  console.log(`[ContextBuilder] Checking Groq API key: ${config.groq.apiKey ? 'EXISTS' : 'MISSING'}`);
   if (!config.groq.apiKey) {
+    console.log('[ContextBuilder] No Groq API key, using fallback extraction');
     return fallbackKnowledgeExtraction(text);
   }
 
   try {
     const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
     const model = config.groq.model || 'llama-3.1-8b-instant';
+    console.log(`[ContextBuilder] Using model: ${model}`);
 
-    // Truncate text for AI processing (keep first 8000 chars which is roughly 2000 tokens)
-    const truncatedText = text.slice(0, 8000);
-    console.log(`[ContextBuilder] Sending ${truncatedText.length} chars to AI for extraction`);
+    // Truncate text for AI processing (keep first 4000 chars which is roughly 1000 tokens)
+    const truncatedText = text.slice(0, 4000);
+    console.log(`[ContextBuilder] Truncated text to ${truncatedText.length} chars for AI`);
+    console.log(`[ContextBuilder] Truncated text preview: ${truncatedText.slice(0, 300).replace(/\n/g, '\\n')}`);
 
     const systemPrompt = `You are a knowledge extraction assistant. Analyze the provided text and extract structured business information. Return ONLY valid JSON.
 
@@ -338,6 +411,10 @@ EXTRACTION RULES:
 
 CRITICAL: Do not return empty arrays. Infer and generate content based on the text provided. Always return valid JSON only, no markdown.`;
 
+    console.log(`[ContextBuilder] Sending request to Groq API...`);
+    console.log(`[ContextBuilder] API URL: ${GROQ_API_URL}`);
+    console.log(`[ContextBuilder] Model: ${model}`);
+
     const response = await fetch(GROQ_API_URL, {
       method: 'POST',
       headers: {
@@ -355,6 +432,8 @@ CRITICAL: Do not return empty arrays. Infer and generate content based on the te
       })
     });
 
+    console.log(`[ContextBuilder] Groq API response status: ${response.status} ${response.statusText}`);
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`[ContextBuilder] Groq API error: ${response.status}`, errorText);
@@ -362,29 +441,34 @@ CRITICAL: Do not return empty arrays. Infer and generate content based on the te
     }
 
     const data = await response.json() as { choices?: [{ message?: { content?: string } }] };
+    console.log(`[ContextBuilder] Response data keys: ${Object.keys(data).join(', ')}`);
+    console.log(`[ContextBuilder] Choices count: ${data.choices?.length || 0}`);
+
     const content = data.choices?.[0]?.message?.content || '';
 
     console.log(`[ContextBuilder] AI raw response length: ${content.length}`);
-    console.log(`[ContextBuilder] AI response preview: ${content.slice(0, 500)}`);
+    console.log(`[ContextBuilder] AI raw response FULL:\n${content}`);
 
     // Parse JSON from response (handle potential markdown code blocks)
+    console.log(`[ContextBuilder] Parsing JSON from response...`);
     const jsonMatch = content.match(/```json\n?([\s\S]*?)```/) || content.match(/```\n?([\s\S]*?)```/);
     const jsonStr = jsonMatch ? jsonMatch[1] : content;
 
-    console.log(`[ContextBuilder] Parsed JSON string: ${jsonStr.slice(0, 500)}`);
+    console.log(`[ContextBuilder] Extracted JSON string length: ${jsonStr.length}`);
+    console.log(`[ContextBuilder] Extracted JSON string:\n${jsonStr.slice(0, 1000)}`);
 
     let parsed: any;
     try {
       parsed = JSON.parse(jsonStr.trim());
-    } catch (parseErr) {
-      console.error('[ContextBuilder] JSON parse failed:', parseErr);
+      console.log(`[ContextBuilder] JSON parsed successfully`);
+    } catch (parseErr: any) {
+      console.error('[ContextBuilder] JSON parse failed:', parseErr.message);
       console.error('[ContextBuilder] Attempted to parse:', jsonStr.slice(0, 1000));
       throw new Error('Failed to parse AI response as JSON');
     }
 
-    console.log('[ContextBuilder] Parsed result:', {
-      hasBusinessSummary: !!parsed.businessSummary,
-      businessSummaryLength: parsed.businessSummary?.length,
+    console.log('[ContextBuilder] Parsed result fields:', {
+      businessSummary: parsed.businessSummary?.slice(0, 100),
       keyProductsCount: parsed.keyProducts?.length || 0,
       commonQACount: parsed.commonQA?.length || 0,
       importantFactsCount: parsed.importantFacts?.length || 0,
@@ -402,10 +486,19 @@ CRITICAL: Do not return empty arrays. Infer and generate content based on the te
         : ['Customer requests human agent', 'Complex issue beyond scope']
     };
 
-    console.log('[ContextBuilder] Final result:', result);
+    console.log('[ContextBuilder] ====== SUCCESS extractKnowledgeWithAI ======');
+    console.log('[ContextBuilder] Final result:', {
+      businessSummaryLength: result.businessSummary?.length,
+      keyProductsCount: result.keyProducts?.length,
+      commonQACount: result.commonQA?.length,
+      importantFactsCount: result.importantFacts?.length,
+      escalationTriggersCount: result.escalationTriggers?.length
+    });
+
     return result;
-  } catch (err) {
+  } catch (err: any) {
     console.error('[ContextBuilder] AI extraction failed, using fallback:', err);
+    console.error('[ContextBuilder] Error stack:', err.stack);
     return fallbackKnowledgeExtraction(text);
   }
 }
@@ -414,7 +507,10 @@ CRITICAL: Do not return empty arrays. Infer and generate content based on the te
  * Fallback knowledge extraction without AI - uses pattern matching
  */
 function fallbackKnowledgeExtraction(text: string): KnowledgeFile {
+  console.log(`[ContextBuilder] Using fallback extraction for ${text.length} chars`);
+
   const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 20);
+  console.log(`[ContextBuilder] Split into ${sentences.length} sentences`);
 
   // Extract sentences that look like key facts (contain numbers, prices, or important keywords)
   const importantFacts = sentences
@@ -439,7 +535,7 @@ function fallbackKnowledgeExtraction(text: string): KnowledgeFile {
   const summarySentences = sentences.slice(0, 3);
   const businessSummary = summarySentences.join('. ') + '.';
 
-  return {
+  const result = {
     businessSummary,
     keyProducts: [],
     commonQA,
@@ -451,6 +547,16 @@ function fallbackKnowledgeExtraction(text: string): KnowledgeFile {
       'Legal or compliance matter'
     ]
   };
+
+  console.log(`[ContextBuilder] Fallback extraction result:`, {
+    businessSummary: result.businessSummary?.slice(0, 100),
+    keyProductsCount: result.keyProducts?.length,
+    commonQACount: result.commonQA?.length,
+    importantFactsCount: result.importantFacts?.length,
+    escalationTriggersCount: result.escalationTriggers?.length
+  });
+
+  return result;
 }
 
 interface BuildAgentKnowledgeFileInput {

@@ -133,8 +133,8 @@ export async function ingestDocument(docId: string): Promise<void> {
 
 async function extractPdfText(buffer: Buffer): Promise<string> {
   try {
-    const pdfModule = await import('pdf-parse');
-    const parser = new pdfModule.PDFParse({ data: buffer });
+    const { PDFParse } = await import('pdf-parse');
+    const parser = new PDFParse({ data: buffer });
     const data = await parser.getText();
     return data.text;
   } catch {

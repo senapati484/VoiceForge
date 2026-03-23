@@ -12,6 +12,8 @@ import { config } from '../config';
 import type { JwtPayload } from '../utils/jwt';
 import mongoose from 'mongoose';
 
+console.log('[Knowledge] Module loading... Timestamp:', Date.now());
+
 const router = Router();
 
 function isStorageError(err: any): boolean {
@@ -70,8 +72,8 @@ router.get('/debug-test', async (req, res) => {
         let extractionMethod = '';
 
         if (doc.type === 'pdf') {
-          const pdfModule = await import('pdf-parse');
-          const parser = new pdfModule.PDFParse({ data: buffer });
+          const { PDFParse } = await import('pdf-parse');
+          const parser = new PDFParse({ data: buffer });
           const result = await parser.getText();
           text = result.text || '';
           extractionMethod = 'pdf-parse';
@@ -133,6 +135,76 @@ router.get('/debug-test', async (req, res) => {
 
   } catch (err: any) {
     console.error('[Debug] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// NEW DEBUG: Check all document statuses and try full context generation
+router.get('/debug-docs', async (req, res) => {
+  try {
+    const userId = req.query.userId as string;
+    if (!userId) {
+      res.status(400).json({ error: 'Add ?userId=YOUR_USER_ID' });
+      return;
+    }
+
+    console.log(`[DebugDocs] Checking docs for user: ${userId}`);
+
+    // Get ALL documents, not just ready ones
+    const allDocs = await KnowledgeDoc.find({ userId });
+    console.log(`[DebugDocs] Total documents: ${allDocs.length}`);
+
+    const docSummary = allDocs.map(d => ({
+      id: d._id.toString(),
+      type: d.type,
+      status: d.status,
+      filename: d.filename,
+      sourceUrl: d.sourceUrl,
+      r2Key: d.r2Key,
+      chunkCount: d.chunkCount,
+      errorMsg: d.errorMsg
+    }));
+
+    // Count by status
+    const statusCounts = allDocs.reduce((acc, d) => {
+      acc[d.status] = (acc[d.status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    // Try running buildKnowledgeFile
+    console.log(`[DebugDocs] Running buildKnowledgeFile...`);
+    let buildResult = null;
+    let buildError = null;
+    try {
+      const { buildKnowledgeFile } = await import('../services/contextBuilder.service');
+      const result = await buildKnowledgeFile(userId);
+      buildResult = {
+        businessSummary: result.businessSummary?.slice(0, 100) + '...',
+        keyProductsCount: result.keyProducts?.length,
+        commonQACount: result.commonQA?.length,
+        importantFactsCount: result.importantFacts?.length,
+        escalationTriggersCount: result.escalationTriggers?.length
+      };
+    } catch (e: any) {
+      console.error('[DebugDocs] buildKnowledgeFile failed:', e);
+      buildError = e.message;
+    }
+
+    res.json({
+      userId,
+      totalDocs: allDocs.length,
+      statusCounts,
+      documents: docSummary,
+      buildResult,
+      buildError,
+      readyDocsCount: statusCounts['ready'] || 0,
+      message: statusCounts['ready'] === 0
+        ? 'No documents with status=ready. Documents must be ready to generate context.'
+        : `${statusCounts['ready']} documents ready for context generation`
+    });
+
+  } catch (err: any) {
+    console.error('[DebugDocs] Error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -351,28 +423,59 @@ router.delete('/:docId', async (req, res, next) => {
 
 // POST /knowledge/generate-context - Build knowledge file and upsert UserKnowledgeContext
 router.post('/generate-context', validate(generateContextSchema), async (req, res, next) => {
+  console.log('[Knowledge] ====== GENERATE CONTEXT ENDPOINT HIT ======');
+  console.log('[Knowledge] Request body:', JSON.stringify(req.body));
+  console.log('[Knowledge] User:', (req.user as JwtPayload)?.userId);
+
   try {
     const userId = (req.user as JwtPayload).userId;
+    console.log(`[Knowledge] Processing for userId: ${userId}`);
 
     // Check if there are ready documents to process
+    console.log(`[Knowledge] Querying for docs with userId=${userId}, status=ready`);
+    const allDocs = await KnowledgeDoc.find({ userId }).select('_id status type filename').lean();
+    console.log(`[Knowledge] All docs for user: ${JSON.stringify(allDocs)}`);
+
     const readyDocs = await KnowledgeDoc.countDocuments({
       userId,
       status: 'ready'
     });
 
+    console.log(`[Knowledge] Found ${readyDocs} ready documents`);
+
     if (readyDocs === 0) {
+      console.log('[Knowledge] ERROR: No ready documents found');
       throw new AppError('No documents ready for processing. Please upload documents and wait for them to be processed.', 400);
     }
 
     // Check credits (3 required for context generation)
+    console.log(`[Knowledge] Looking up user ${userId}`);
     const user = await User.findById(userId);
-    if (!user || user.credits < COSTS.CONTEXT) {
+    console.log(`[Knowledge] User found: ${!!user}, credits: ${user?.credits}, required: ${COSTS.CONTEXT}`);
+
+    if (!user) {
+      console.log('[Knowledge] ERROR: User not found');
+      throw new AppError('User not found', 404);
+    }
+
+    if (user.credits < COSTS.CONTEXT) {
+      console.log(`[Knowledge] ERROR: Insufficient credits (${user.credits} < ${COSTS.CONTEXT})`);
       throw new AppError(`Insufficient credits (${COSTS.CONTEXT} required)`, 402);
     }
 
+    console.log(`[Knowledge] Credits check passed: ${user.credits} available`);
+
     // Build knowledge file using AI-powered extraction
+    console.log('[Knowledge] Importing buildKnowledgeFile...');
     const { buildKnowledgeFile } = await import('../services/contextBuilder.service');
+    console.log('[Knowledge] Calling buildKnowledgeFile...');
     const knowledgeFile = await buildKnowledgeFile(userId);
+    console.log('[Knowledge] buildKnowledgeFile returned:', JSON.stringify({
+      businessSummary: knowledgeFile.businessSummary?.slice(0, 100),
+      keyProductsCount: knowledgeFile.keyProducts?.length,
+      commonQACount: knowledgeFile.commonQA?.length,
+      importantFactsCount: knowledgeFile.importantFacts?.length
+    }));
 
     // Save to UserKnowledgeContext
     const saved = await UserKnowledgeContext.findOneAndUpdate(
@@ -391,6 +494,7 @@ router.post('/generate-context', validate(generateContextSchema), async (req, re
     });
 
     // Return comprehensive response
+    console.log('[Knowledge] Sending success response');
     res.json({
       success: true,
       knowledgeFile,
@@ -413,6 +517,7 @@ router.post('/generate-context', validate(generateContextSchema), async (req, re
       }
     });
   } catch (err) {
+    console.error('[Knowledge] ERROR in generate-context:', err);
     next(err);
   }
 });
@@ -504,8 +609,8 @@ router.get('/test-extraction/:docId', async (req, res, next) => {
 
     try {
       if (doc.type === 'pdf') {
-        const pdfModule = await import('pdf-parse');
-        const parser = new pdfModule.PDFParse({ data: buffer });
+        const { PDFParse } = await import('pdf-parse');
+        const parser = new PDFParse({ data: buffer });
         const result = await parser.getText();
         extractedText = result.text || '';
         rawPdfData = {
@@ -621,8 +726,8 @@ router.get('/debug-context', async (req, res, next) => {
 
           let text = '';
           if (doc.type === 'pdf') {
-            const pdfModule = await import('pdf-parse');
-            const parser = new pdfModule.PDFParse({ data: buffer });
+            const { PDFParse } = await import('pdf-parse');
+            const parser = new PDFParse({ data: buffer });
             const result = await parser.getText();
             text = result.text || '';
           } else if (doc.type === 'docx') {
@@ -739,8 +844,8 @@ router.get('/debug-test', async (req, res, next) => {
 
           try {
             if (doc.type === 'pdf') {
-              const pdfModule = await import('pdf-parse');
-              const parser = new pdfModule.PDFParse({ data: buffer });
+              const { PDFParse } = await import('pdf-parse');
+              const parser = new PDFParse({ data: buffer });
               const result = await parser.getText();
               text = result.text || '';
             } else if (doc.type === 'docx') {

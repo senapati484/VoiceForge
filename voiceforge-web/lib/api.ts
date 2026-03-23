@@ -21,7 +21,7 @@ const API_BASE_URL = RAW_API_URL.endsWith('/api') ? RAW_API_URL : `${RAW_API_URL
 // Create axios instance
 const http: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: 60000, // Increased from 30s to 60s for context generation
   headers: {
     'Content-Type': 'application/json'
   }

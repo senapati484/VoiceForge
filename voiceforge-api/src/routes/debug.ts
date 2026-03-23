@@ -93,10 +93,10 @@ export function addDebugRoutes(app: Express): void {
               try {
                 details.extraction.docType = doc.type;
                 if (doc.type === 'pdf') {
-                  const pdfModule = await import('pdf-parse');
-                  details.extraction.pdfModuleKeys = Object.keys(pdfModule).slice(0,10);
-                  details.extraction.PDFParseType = typeof pdfModule.PDFParse;
-                  const parser = new pdfModule.PDFParse({ data: buffer });
+                  const { PDFParse } = await import('pdf-parse');
+                  details.extraction.pdfModuleKeys = Object.keys(await import('pdf-parse')).slice(0,10);
+                  details.extraction.PDFParseType = typeof PDFParse;
+                  const parser = new PDFParse({ data: buffer });
                   details.extraction.parserCreated = true;
                   const result = await parser.getText();
                   text = result.text || '';
