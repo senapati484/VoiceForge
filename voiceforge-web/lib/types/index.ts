@@ -130,7 +130,7 @@ export interface CsvContact {
 
 // Call Log Types
 export interface TranscriptEntry {
-  role: 'agent' | 'user';
+  role: 'assistant' | 'user';
   text: string;
   timestamp: number;
 }

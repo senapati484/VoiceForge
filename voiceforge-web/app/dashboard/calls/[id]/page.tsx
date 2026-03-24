@@ -32,6 +32,11 @@ export default async function CallDetailPage({
 
   const call = result.call;
 
+  // Debug: Log transcript roles
+  if (call.transcript?.length) {
+    console.log("Transcript entries:", call.transcript.map((e: { role: string; text: string }) => ({ role: e.role, text: e.text.slice(0, 30) })));
+  }
+
   return (
     <div className="space-y-4 p-6">
       {call.campaignId && (
@@ -64,17 +69,25 @@ export default async function CallDetailPage({
         </CardHeader>
         <CardContent className="space-y-2">
           {call.transcript?.length ? (
-            call.transcript.map((entry, idx) => (
-              <div key={`${entry.timestamp}-${idx}`} className={`flex ${entry.role === "agent" ? "justify-start" : "justify-end"}`}>
-                <div
-                  className={`max-w-[75%] rounded-lg px-3 py-2 text-sm ${
-                    entry.role === "agent" ? "bg-purple-100 text-purple-900" : "bg-slate-200 text-slate-800"
-                  }`}
-                >
-                  {entry.text}
+            call.transcript.map((entry, idx) => {
+              const isAgent = entry.role === "assistant";
+              return (
+                <div key={`${entry.timestamp}-${idx}`} className={`flex ${isAgent ? "justify-start" : "justify-end"}`}>
+                  <div
+                    className={`max-w-[75%] rounded-lg px-3 py-2 text-sm ${
+                      isAgent
+                        ? "bg-purple-100 text-purple-900"
+                        : "bg-indigo-100 text-indigo-900"
+                    }`}
+                  >
+                    <p className="text-xs font-medium opacity-70 mb-1">
+                      {isAgent ? "Agent" : "User"}
+                    </p>
+                    <p>{entry.text}</p>
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           ) : (
             <p className="text-sm text-slate-500">No transcript available.</p>
           )}
