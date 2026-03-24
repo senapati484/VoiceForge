@@ -468,6 +468,9 @@ router.post('/generate-context', validate(generateContextSchema), async (req, re
     // Build knowledge file using AI-powered extraction
     console.log('[Knowledge] Importing buildKnowledgeFile...');
     const { buildKnowledgeFile } = await import('../services/contextBuilder.service');
+    const { compressKnowledgeFile } = await import('../services/compactContext.service');
+    const { Agent } = await import('../db');
+
     console.log('[Knowledge] Calling buildKnowledgeFile...');
     const knowledgeFile = await buildKnowledgeFile(userId);
     console.log('[Knowledge] buildKnowledgeFile returned:', JSON.stringify({
@@ -477,10 +480,22 @@ router.post('/generate-context', validate(generateContextSchema), async (req, re
       importantFactsCount: knowledgeFile.importantFacts?.length
     }));
 
-    // Save to UserKnowledgeContext
+    // NEW: Get agent info for tone, then compress to compact format
+    const agent = await Agent.findOne({ userId });
+    const compactContext = compressKnowledgeFile(knowledgeFile, {
+      tone: agent?.tone || 'professional',
+      callObjective: agent?.callObjective || 'Help customers'
+    });
+
+    // Save to UserKnowledgeContext with both formats
     const saved = await UserKnowledgeContext.findOneAndUpdate(
       { userId },
-      { knowledgeFile, generatedAt: new Date() },
+      {
+        knowledgeFile,           // Legacy format (backward compat)
+        compactContext,          // NEW: Compact format
+        generatedAt: new Date(),
+        version: 2              // NEW: Track format version
+      },
       { upsert: true, new: true }
     );
 
@@ -493,22 +508,32 @@ router.post('/generate-context', validate(generateContextSchema), async (req, re
       description: 'Generate knowledge context'
     });
 
+    // Calculate token savings
+    const verboseSize = JSON.stringify(knowledgeFile).length;
+    const compactSize = JSON.stringify(compactContext).length;
+    const tokenSavings = Math.round(((verboseSize - compactSize) / verboseSize) * 100);
+
     // Return comprehensive response
     console.log('[Knowledge] Sending success response');
     res.json({
       success: true,
       knowledgeFile,
+      compactContext,  // NEW: Include compact format in response
       stats: {
         documentsProcessed: readyDocs,
         businessSummaryLength: knowledgeFile.businessSummary?.length || 0,
         productsFound: knowledgeFile.keyProducts?.length || 0,
         qaPairs: knowledgeFile.commonQA?.length || 0,
         importantFacts: knowledgeFile.importantFacts?.length || 0,
-        escalationTriggers: knowledgeFile.escalationTriggers?.length || 0
+        escalationTriggers: knowledgeFile.escalationTriggers?.length || 0,
+        tokenSavings: tokenSavings + '%',  // NEW: Show compression ratio
+        verboseTokens: Math.ceil(verboseSize / 4),
+        compactTokens: Math.ceil(compactSize / 4)
       },
       context: {
         id: saved?._id.toString(),
         generatedAt: saved?.generatedAt,
+        version: 2,  // NEW: Indicate compact format
         isReady: Boolean(
           knowledgeFile.businessSummary ||
           knowledgeFile.keyProducts?.length > 0 ||
@@ -532,20 +557,24 @@ router.get('/context', async (req, res, next) => {
       return;
     }
 
-    // Calculate stats from stored knowledgeFile
+    // Calculate stats from stored formats
     const knowledgeFile = context.knowledgeFile as any;
+    const compactContext = context.compactContext as any;
 
     res.json({
       context: {
         id: context._id.toString(),
         knowledgeFile: context.knowledgeFile,
+        compactContext: context.compactContext,  // NEW: Include compact format
+        version: context.version || 1,
         generatedAt: context.generatedAt,
         stats: {
           businessSummaryLength: knowledgeFile?.businessSummary?.length || 0,
           productsFound: knowledgeFile?.keyProducts?.length || 0,
           qaPairs: knowledgeFile?.commonQA?.length || 0,
           importantFacts: knowledgeFile?.importantFacts?.length || 0,
-          escalationTriggers: knowledgeFile?.escalationTriggers?.length || 0
+          escalationTriggers: knowledgeFile?.escalationTriggers?.length || 0,
+          compactFormatAvailable: !!compactContext
         }
       }
     });

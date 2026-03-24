@@ -123,10 +123,11 @@ export const config = {
     baseUrl: 'https://api.smolify.com/v1',
     model: process.env.SMOLIFY_MODEL || 'meta-llama/Meta-Llama-3.1-70B-Instruct'
   },
-  // Gemini — for context extraction
+  // Gemini — for context extraction (multimodal PDF support)
   gemini: {
     apiKey: firstEnv(['GEMINI_API_KEY', 'GOOGLE_API_KEY']),
     model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+    extractionModel: process.env.GEMINI_EXTRACTION_MODEL || 'gemini-2.5-flash',
     maxRetries: optionalInt(process.env.GEMINI_MAX_RETRIES) ?? 2,
     maxOutputTokens: optionalInt(process.env.GEMINI_MAX_OUTPUT_TOKENS) ?? 800,
     contextMaxOutputTokens: optionalInt(process.env.GEMINI_CONTEXT_MAX_OUTPUT_TOKENS) ?? 800,
@@ -136,13 +137,15 @@ export const config = {
     topK: optionalInt(process.env.GEMINI_TOP_K),
     stopSequences: optionalList(process.env.GEMINI_STOP_SEQUENCES)
   },
-  // Groq — primary LLM for voice calls (fast, good free tier)
+  // Groq — primary LLM for voice calls (fast, low latency)
   groq: {
     apiKey: firstEnv(['GROQ_API_KEY']),
-    model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'
+    model: process.env.GROQ_MODEL || 'llama-3.1-8b-instant', // Default to 8B for speed
+    voiceModel: process.env.GROQ_VOICE_MODEL || 'llama-3.1-8b-instant', // Fast responses
+    contextModel: process.env.GROQ_CONTEXT_MODEL || 'llama-3.3-70b-versatile' // Accurate extraction
   },
   context: {
-    provider: (process.env.CONTEXT_PROVIDER || 'gemini') as 'hf' | 'gemini'
+    provider: (process.env.CONTEXT_PROVIDER || 'gemini') as 'hf' | 'gemini' | 'groq'
   },
   hf: {
     modelId: process.env.HF_MODEL_ID || 'Sayan25/smolified-file-context-extractor',

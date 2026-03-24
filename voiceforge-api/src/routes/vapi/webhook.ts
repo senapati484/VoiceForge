@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import { Types } from 'mongoose';
 import { config } from '../../config';
 import { Agent, CallLog, User, CreditLedger, Campaign, CsvContact, UserKnowledgeContext } from '../../db';
-import { buildSystemPrompt, buildCombinedSystemPrompt, type KnowledgeFile, clearAgentContextCache } from '../../services/contextBuilder.service';
+import { buildSystemPrompt, buildCombinedSystemPrompt, type KnowledgeContext, type KnowledgeFile, clearAgentContextCache } from '../../services/contextBuilder.service';
 import { retrieveText } from '../../services/pinecone.service';
 
 /**
@@ -160,10 +160,17 @@ async function handleAssistantRequest(message: any, res: Response): Promise<void
       console.log(`📞 [Vapi Webhook] Agent: ${agent.name} (${agent.agentType}) - ${lookupMethod}`);
 
       // Fetch user's business context (from knowledge documents)
-      let businessContext: KnowledgeFile | null = null;
+      // NEW: Prefer compact context for smaller token usage
+      let businessContext: KnowledgeContext | null = null;
       if (userId) {
         const userKnowledge = await UserKnowledgeContext.findOne({ userId });
-        if (userKnowledge?.knowledgeFile) {
+        if (userKnowledge?.compactContext) {
+          // NEW: Use compact format (60-70% fewer tokens)
+          console.log(`[Vapi Webhook] Using compact context v${userKnowledge.version}`);
+          businessContext = userKnowledge.compactContext as unknown as KnowledgeContext;
+        } else if (userKnowledge?.knowledgeFile) {
+          // Fallback to legacy format
+          console.log('[Vapi Webhook] Using legacy knowledgeFile (no compact context found)');
           businessContext = userKnowledge.knowledgeFile as unknown as KnowledgeFile;
         }
       }

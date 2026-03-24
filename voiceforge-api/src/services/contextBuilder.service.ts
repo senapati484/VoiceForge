@@ -1,23 +1,24 @@
 import { config } from '../config';
 import { Agent, type IAgent, KnowledgeDoc, type IKnowledgeDoc } from '../db';
 import { getFileFromR2 } from './r2.service';
+import { extractWithGemini, isGeminiAvailable } from './gemini.service';
+import {
+  compressKnowledgeFile,
+  expandCompactContext
+} from './compactContext.service';
+import type {
+  KnowledgeFile,
+  KnowledgeContext,
+  CompactContextV2
+} from '../types/compactContext';
+import { isCompactContext } from '../types/compactContext';
+
+// Re-export types for backward compatibility
+export type { KnowledgeFile, KnowledgeContext, CompactContextV2 };
 
 // In-memory cache for compiled contexts
 const contextCache = new Map<string, { context: string; timestamp: number }>();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes cache
-
-export interface KnowledgeFile {
-  businessSummary: string;
-  keyProducts: Array<{
-    name: string;
-    price?: string;
-    description: string;
-    features: string[];
-  }>;
-  commonQA: Array<{ question: string; answer: string }>;
-  importantFacts: string[];
-  escalationTriggers: string[];
-}
 
 /**
  * Check if text is valid (not binary garbage)
@@ -369,10 +370,43 @@ async function extractKnowledgeWithAI(text: string): Promise<KnowledgeFile> {
     return fallbackKnowledgeExtraction(text);
   }
 
+  // Provider selection based on config
+  const provider = config.context.provider;
+  console.log(`[ContextBuilder] Using provider: ${provider}`);
+
+  // Try Gemini first if configured and available
+  if (provider === 'gemini' && isGeminiAvailable()) {
+    console.log('[ContextBuilder] Using Gemini for extraction');
+    try {
+      return await extractWithGemini(Buffer.from(text), 'text/plain');
+    } catch (geminiError: any) {
+      // Check if it's a rate limit error
+      if (geminiError.message?.includes('429') ||
+          geminiError.message?.includes('quota') ||
+          geminiError.message?.includes('exceeded')) {
+        console.warn('[ContextBuilder] Gemini rate limit exceeded, falling back to Groq');
+        console.warn('[ContextBuilder] Gemini error:', geminiError.message);
+      } else {
+        console.warn('[ContextBuilder] Gemini extraction failed, falling back to Groq');
+        console.warn('[ContextBuilder] Gemini error:', geminiError.message);
+      }
+      // Continue to Groq fallback
+    }
+  }
+
+  // Fallback to Groq (either by config or Gemini failure)
+  console.log('[ContextBuilder] Using Groq for extraction');
+  return extractWithGroq(text);
+}
+
+/**
+ * Extract knowledge using Groq
+ */
+async function extractWithGroq(text: string): Promise<KnowledgeFile> {
   try {
     const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-    const model = config.groq.model || 'llama-3.1-8b-instant';
-    console.log(`[ContextBuilder] Using model: ${model}`);
+    const model = config.groq.contextModel || config.groq.model || 'llama-3.3-70b-versatile';
+    console.log(`[ContextBuilder] Using Groq model: ${model}`);
 
     // Truncate text for AI processing (keep first 4000 chars which is roughly 1000 tokens)
     const truncatedText = text.slice(0, 4000);
@@ -692,11 +726,18 @@ export function buildSystemPrompt(
 /**
  * Build combined prompt with agent + business context
  * Optimized for size and speed
+ * Supports both KnowledgeFile (legacy) and CompactContextV2
  */
 export function buildCombinedSystemPrompt(
   agent: IAgent,
-  businessContext?: KnowledgeFile | null
+  businessContext?: KnowledgeContext | null
 ): string {
+  // NEW: Handle compact context format
+  if (businessContext && isCompactContext(businessContext)) {
+    return buildPromptFromCompact(agent, businessContext);
+  }
+
+  // Legacy KnowledgeFile handling
   const cacheKey = `combined-${agent._id}-${businessContext ? 'bc' : 'nbc'}`;
 
   const cached = contextCache.get(cacheKey);
@@ -705,6 +746,7 @@ export function buildCombinedSystemPrompt(
   }
 
   const agentKnowledge = agent.knowledgeFile as KnowledgeFile | undefined;
+  const bc = businessContext as KnowledgeFile | null;
 
   // Build compact combined context
   const parts: string[] = [];
@@ -719,14 +761,14 @@ export function buildCombinedSystemPrompt(
   }
 
   // Business knowledge (user-level)
-  if (businessContext?.businessSummary) {
-    parts.push(`\nCompany: ${businessContext.businessSummary.slice(0, 150)}`);
+  if (bc?.businessSummary) {
+    parts.push(`\nCompany: ${bc.businessSummary.slice(0, 150)}`);
   }
 
   // Combined products/services
   const allProducts = [
     ...(agentKnowledge?.keyProducts?.slice(0, 2) || []),
-    ...(businessContext?.keyProducts?.slice(0, 2) || [])
+    ...(bc?.keyProducts?.slice(0, 2) || [])
   ];
   if (allProducts.length) {
     const products = allProducts
@@ -738,7 +780,7 @@ export function buildCombinedSystemPrompt(
   // Combined FAQ
   const allQA = [
     ...(agentKnowledge?.commonQA?.slice(0, 2) || []),
-    ...(businessContext?.commonQA?.slice(0, 2) || [])
+    ...(bc?.commonQA?.slice(0, 2) || [])
   ];
   if (allQA.length) {
     const qa = allQA
@@ -750,7 +792,7 @@ export function buildCombinedSystemPrompt(
   // Escalation
   const allEscalations = [
     ...(agentKnowledge?.escalationTriggers || []),
-    ...(businessContext?.escalationTriggers || [])
+    ...(bc?.escalationTriggers || [])
   ];
   if (allEscalations.length) {
     parts.push(`\nEscalate: ${allEscalations.slice(0, 3).join(', ')}`);
@@ -764,6 +806,33 @@ export function buildCombinedSystemPrompt(
   contextCache.set(cacheKey, { context, timestamp: Date.now() });
 
   return context;
+}
+
+/**
+ * Build prompt from compact context
+ * Efficient expansion of compressed format
+ */
+function buildPromptFromCompact(
+  agent: IAgent,
+  compact: CompactContextV2
+): string {
+  const cacheKey = `compact-${agent._id}-${compact.a.slice(0, 20)}`;
+
+  const cached = contextCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return cached.context;
+  }
+
+  // Use the expand function from compactContext.service
+  const prompt = expandCompactContext(compact, {
+    name: agent.name,
+    agentType: agent.agentType,
+    businessName: agent.businessName,
+    callObjective: agent.callObjective
+  });
+
+  contextCache.set(cacheKey, { context: prompt, timestamp: Date.now() });
+  return prompt;
 }
 
 /**
